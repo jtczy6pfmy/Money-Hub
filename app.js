@@ -5,7 +5,7 @@ function spending(){$("spendingList").innerHTML=table(["Date","Description","Cat
   if (data?.error) throw new Error(data.error);
   return data;
 }
-async async function connectPlaidAccount() {
+async function connectPlaidAccount() {
   try {
     if (!window.Plaid) throw new Error("Plaid Link did not load. Please refresh the page and try again.");
     toast("Opening secure bank connection…");
