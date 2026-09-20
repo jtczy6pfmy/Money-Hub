@@ -207,20 +207,25 @@ async function getPlaidStatus() {
   return Array.isArray(data?.items) ? data.items : [];
 }
 
-async function connectPlaidAccount() {
+async function connectPlaidAccount(options = {}) {
   try {
     if (!window.Plaid) throw new Error("Plaid is still loading. Please try again.");
     toast("Opening secure bank connection…");
-    const data = await plaidCall("create_link_token");
+    const data = await plaidCall("create_link_token", {
+      institution_id: options.institutionId || undefined
+    });
     const handler = window.Plaid.create({
       token: data.link_token,
       onSuccess: async (public_token) => {
         try {
           toast("Finishing account connection…");
-          await plaidCall("exchange_public_token", { public_token });
+          await plaidCall("exchange_public_token", {
+            public_token,
+            account_login_id: options.accountLoginId || null
+          });
           await loadAccountsData();
           accounts();
-          toast("Account connected");
+          toast((options.institutionName || "Account") + " connected");
         } catch (err) {
           console.error("Plaid connection failed", err);
           toast(err?.message || "Unable to finish the account connection.");
@@ -485,10 +490,19 @@ document.addEventListener("click", async e => {
     const action = a.dataset.action;
     if (action === "sync-credit-one") {
       try {
+        const login = state.logins.find(x => /credit one/i.test(String(x.account_name || "")));
+        if (!login) throw new Error("Save your Credit One login in the Vault first.");
         const status = await plaidCall("status");
         const linked = (status.items || []).some(x => /credit one/i.test(String(x.institution_name || "")));
-        if (!linked) await connectPlaidAccount();
-        else await syncPlaidAccounts();
+        if (!linked) {
+          await connectPlaidAccount({
+            institutionId: "ins_129619",
+            institutionName: "Credit One",
+            accountLoginId: login.id
+          });
+        } else {
+          await syncPlaidAccounts();
+        }
       } catch (err) {
         console.error("Credit One connection check failed", err);
         toast(err?.message || "Unable to connect Credit One.");
