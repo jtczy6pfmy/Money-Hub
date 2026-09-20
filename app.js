@@ -184,6 +184,56 @@ async function logins() {
 function spending() { $("spendingList").innerHTML = table(["Date", "Description", "Category", "Account", "Amount"], state.transactions.map(x => '<tr><td>' + esc(x.transaction_date) + '</td><td>' + esc(x.description) + '</td><td>' + esc(x.category) + '</td><td>' + esc(x.account_name) + '</td><td>' + money(x.amount) + '</td></tr>')); }
 function planner() { $("plannerList").innerHTML = state.plans.map(x => '<article class="account-card"><span class="badge">Paycheck</span><h3>' + esc(x.source_name || "Paycheck") + '</h3><div class="big">' + money(x.expected_amount) + '</div><span class="muted">' + esc(x.paycheck_date) + '</span></article>').join("") || '<div class="panel"><span class="muted">Create a paycheck plan to assign money before payday.</span></div>'; }
 
+async function plaidCall(action, extra = {}) {
+  const { data, error } = await sb.functions.invoke("plaid", { body: { action, ...extra } });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+async function connectPlaidAccount() {
+  try {
+    if (!window.Plaid) throw new Error("Plaid is still loading. Please try again.");
+    toast("Opening secure bank connection…");
+    const data = await plaidCall("create_link_token");
+    const handler = window.Plaid.create({
+      token: data.link_token,
+      onSuccess: async (public_token) => {
+        try {
+          toast("Finishing account connection…");
+          await plaidCall("exchange_public_token", { public_token });
+          await loadAccountsData();
+          accounts();
+          toast("Account connected");
+        } catch (err) {
+          console.error("Plaid connection failed", err);
+          toast(err?.message || "Unable to finish the account connection.");
+        }
+      },
+      onExit: (err) => {
+        if (err) console.error("Plaid Link exited", err);
+      }
+    });
+    handler.open();
+  } catch (err) {
+    console.error("Plaid Link failed", err);
+    toast(err?.message || "Unable to connect the account.");
+  }
+}
+
+async function syncPlaidAccounts() {
+  try {
+    toast("Updating connected accounts…");
+    await plaidCall("refresh");
+    await loadAccountsData();
+    accounts();
+    toast("Accounts updated");
+  } catch (err) {
+    console.error("Plaid refresh failed", err);
+    toast(err?.message || "Unable to update connected accounts.");
+  }
+}
+
 async function loadAccountsData() {
   const { data, error } = await sb.from("finance_accounts").select("*").eq("household_id", state.household.id).eq("is_active", true);
   if (error) { console.error(error); state.accounts = []; return; }
@@ -393,12 +443,10 @@ $("refresh").onclick = async () => {
   }
 };
 $("refreshAccounts").onclick = async () => {
-  await loadAccountsData();
-  accounts();
-  toast("Accounts refreshed");
+  await syncPlaidAccounts();
 };
 
-document.addEventListener("click", e => {
+document.addEventListener("click", async e => {
   let n = e.target.closest("[data-section]");
   if (n) show(n.dataset.section);
   let l = e.target.closest("[data-section-link]");
@@ -408,8 +456,15 @@ document.addEventListener("click", e => {
     e.preventDefault();
     const action = a.dataset.action;
     if (action === "sync-capital-one") {
-      window.postMessage({ type: "MONEY_HUB_REQUEST_CAPITAL_ONE_SYNC" }, window.location.origin);
-      toast("Sync request sent to Capital One extension");
+      try {
+        const status = await plaidCall("status");
+        const linked = (status.items || []).some(x => /capital one/i.test(String(x.institution_name || "")));
+        if (!linked) await connectPlaidAccount();
+        else await syncPlaidAccounts();
+      } catch (err) {
+        console.error("Capital One connection check failed", err);
+        toast(err?.message || "Unable to connect Capital One.");
+      }
       return;
     }
     openModal(action.startsWith("add-") ? action.slice(4) : action);
