@@ -2,58 +2,41 @@
   let last = null;
 
   function readDocument(doc) {
-    const nodes = Array.from(doc.querySelectorAll(
-      ".primary-detail__balance__dollar, [class*='primary-detail__balance__dollar']"
-    ));
-
+    const previous = document;
+    try {
+      return (function() {
+        function readBalance() {
     const parse = (raw) => {
       const text = String(raw || "").replace(/\u00a0/g, " ").trim();
-      const matches = text.match(/-?\$?\s*[0-9][0-9,]*(?:\.\d{1,2})?/g) || [];
-      return matches.map(x => Number(x.replace(/[^0-9.-]/g, "")))
-        .filter(Number.isFinite);
+      const match = text.match(/-?\$?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/);
+      if (!match) return null;
+      const value = Number(match[1].replace(/,/g, ""));
+      return Number.isFinite(value) ? value : null;
     };
 
-    const values = [];
-    for (const el of nodes) {
-      const style = getComputedStyle(el);
-      const rect = el.getBoundingClientRect();
-      if (style.display === "none" || style.visibility === "hidden" ||
-          style.opacity === "0" || rect.width <= 0 || rect.height <= 0) continue;
+    // Capital One renders the account balance as a parent containing
+    // multiple dollar/superscript nodes. The first dollar node is empty;
+    // the second dollar node contains the actual whole-dollar amount.
+    const balances = Array.from(document.querySelectorAll(".primary-detail__balance"));
+    for (const balance of balances) {
+      const parts = Array.from(balance.querySelectorAll(".primary-detail__balance__dollar"))
+        .map(el => parse(el.textContent || el.innerText || ""))
+        .filter(v => v !== null);
 
-      for (const source of [
-        el.textContent,
-        el.innerText,
-        el.getAttribute("aria-label"),
-        el.getAttribute("title")
-      ]) {
-        values.push(...parse(source));
-      }
+      const nonZero = parts.filter(v => v !== 0);
+      if (nonZero.length) return nonZero[0];
+      if (parts.length) return parts[0];
     }
 
-    const nonZero = values.filter(v => v !== 0);
-    return nonZero.length ? nonZero[0] : (values.length ? values[0] : null);
-  }
+    // Fallback for minor Capital One markup changes.
+    const direct = Array.from(document.querySelectorAll(
+      ".primary-detail__balance__dollar"
+    ))
+      .map(el => parse(el.textContent || el.innerText || ""))
+      .filter(v => v !== null);
 
-  function readBalance() {
-    const values = [];
-
-    const visit = (win) => {
-      try {
-        const value = readDocument(win.document);
-        if (Number.isFinite(value)) values.push(value);
-
-        for (let i = 0; i < win.frames.length; i++) {
-          visit(win.frames[i]);
-        }
-      } catch (_) {
-        // Cross-origin frames are intentionally skipped.
-      }
-    };
-
-    visit(window);
-
-    const nonZero = values.filter(v => v !== 0);
-    return nonZero.length ? nonZero[0] : (values.length ? values[0] : null);
+    const nonZeroDirect = direct.filter(v => v !== 0);
+    return nonZeroDirect.length ? nonZeroDirect[0] : (direct[0] ?? null);
   }
 
   function sync(force = false) {
