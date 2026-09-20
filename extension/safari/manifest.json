@@ -1,0 +1,21 @@
+{
+  "manifest_version": 2,
+  "name": "Money Hub",
+  "version": "1.0.0",
+  "description": "Capture supported financial balances and send them to your Money Hub.",
+  "permissions": ["storage", "activeTab", "tabs", "https://*/*", "http://*/*"],
+  "browser_action": {
+    "default_title": "Money Hub",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "scripts": ["../shared/config.js", "../shared/detector.js", "background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "js": ["../shared/config.js", "../shared/detector.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
