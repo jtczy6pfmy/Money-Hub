@@ -1,21 +1,29 @@
 (() => {
   let last = null;
+
   function readBalance() {
     const el = document.querySelector(".primary-detail__balance__dollar");
     if (!el) return null;
     const value = Number((el.textContent || "").replace(/[^0-9.-]/g, ""));
     return Number.isFinite(value) ? value : null;
   }
-  function sync() {
+
+  function sync(force = false) {
     const balance = readBalance();
-    if (balance === null || balance === last) return;
+    if (balance === null || (!force && balance === last)) return;
     last = balance;
     chrome.runtime.sendMessage({ type: "CAPITAL_ONE_BALANCE", balance });
   }
+
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === "REQUEST_CAPITAL_ONE_SYNC") sync();
+    if (msg?.type === "REQUEST_CAPITAL_ONE_SYNC") sync(true);
   });
+
   sync();
-  new MutationObserver(sync).observe(document.documentElement, {subtree:true, childList:true, characterData:true});
-  setInterval(sync, 5000);
+  new MutationObserver(() => sync()).observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    characterData: true
+  });
+  setInterval(() => sync(), 5000);
 })();
