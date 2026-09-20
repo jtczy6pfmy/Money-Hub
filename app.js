@@ -44,7 +44,7 @@ async function refreshPlaidBalances() {
   }
 }
 async function loadAccountsData(){
-  const {data,error}=await sb.from("finance_accounts").select("*").eq("household_id",state.householdId).eq("is_active",true);
+  const {data,error}=await sb.from("finance_accounts").select("*").eq("household_id",state.household.id).eq("is_active",true);
   if(error){console.error(error);state.accounts=[];return}
   state.accounts=data||[];
 }
