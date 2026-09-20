@@ -498,7 +498,6 @@ document.addEventListener("click", async e => {
         const linked = (status.items || []).some(x => /credit one/i.test(String(x.institution_name || "")));
         if (!linked) {
           await connectPlaidAccount({
-            institutionId: "ins_129619",
             institutionName: "Credit One",
             accountLoginId: login.id
           });
