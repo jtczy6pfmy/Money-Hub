@@ -304,7 +304,7 @@ window.addEventListener("message", async (event) => {
 
 function accounts() {
   const capital = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
-  const creditOne = state.accounts.find(x => /credit one/i.test(String(x.institution_name || "")));
+  const creditOne = state.accounts.find(x => /credit\s*one/i.test(String(x.institution_name || "")));
   const balance = capital ? (capital.current_balance ?? capital.available_balance ?? 0) : 0;
   const balanceBox = $("capitalOneBalance");
   if (balanceBox) balanceBox.textContent = money(balance);
@@ -492,7 +492,7 @@ document.addEventListener("click", async e => {
     const action = a.dataset.action;
     if (action === "sync-credit-one") {
       try {
-        const login = state.logins.find(x => /credit one/i.test(String(x.account_name || "")));
+        const login = state.logins.find(x => /credit\s*one/i.test(String(x.account_name || "")));
         if (!login) throw new Error("Save your Credit One login in the Vault first.");
         const status = await plaidCall("status");
         const linked = (status.items || []).some(x => /credit one/i.test(String(x.institution_name || "")));
