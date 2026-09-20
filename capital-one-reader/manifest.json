@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Money Hub Capital One Balance Reader",
+  "version": "1.0.0",
+  "description": "Reads the visible Capital One card balance and makes it available to Money Hub.",
+  "permissions": ["storage", "clipboardWrite"],
+  "host_permissions": [
+    "https://myaccounts.capitalone.com/*",
+    "https://*.capitalone.com/*",
+    "https://jtczy6pfmy.github.io/Money-Hub/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://myaccounts.capitalone.com/*",
+        "https://*.capitalone.com/*",
+        "https://jtczy6pfmy.github.io/Money-Hub/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
