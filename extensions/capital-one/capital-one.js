@@ -73,7 +73,18 @@
   }
 
   (typeof browser !== "undefined" ? browser : chrome).runtime.onMessage.addListener((msg) => {
-    if (msg?.type === "REQUEST_CAPITAL_ONE_SYNC") sync(true);
+    if (msg?.type === "REQUEST_CAPITAL_ONE_SYNC") {
+      const balance = readBalance();
+      if (Number.isFinite(balance)) {
+        last = balance;
+        (typeof browser !== "undefined" ? browser : chrome).runtime.sendMessage({
+          type: "CAPITAL_ONE_BALANCE",
+          balance
+        });
+        return Promise.resolve({ balance });
+      }
+      return Promise.resolve({ balance: null });
+    }
   });
 
   sync();
