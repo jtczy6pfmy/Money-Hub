@@ -304,13 +304,23 @@ window.addEventListener("message", async (event) => {
 
 function accounts() {
   const capital = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
-  const creditOne = state.accounts.find(x => /credit\s*one/i.test(String(x.institution_name || "")));
+  const creditOneAccounts = state.accounts.filter(x => /credit\s*one/i.test(String(x.institution_name || "")));
   const balance = capital ? (capital.current_balance ?? capital.available_balance ?? 0) : 0;
   const balanceBox = $("capitalOneBalance");
   if (balanceBox) balanceBox.textContent = money(balance);
-  const creditOneBalanceBox = $("creditOneBalance");
-  const creditOneBalance = creditOne ? (creditOne.current_balance ?? creditOne.available_balance ?? 0) : 0;
-  if (creditOneBalanceBox) creditOneBalanceBox.textContent = money(creditOneBalance);
+
+  const creditOneAccountsBox = $("creditOneAccounts");
+  if (creditOneAccountsBox) {
+    creditOneAccountsBox.innerHTML = creditOneAccounts.length
+      ? creditOneAccounts.map((account, index) => {
+          const current = account.current_balance ?? 0;
+          const available = account.available_balance;
+          const limit = account.credit_limit;
+          const label = creditOneAccounts.length > 1 ? "Credit One Account " + (index + 1) : "Credit One";
+          return '<div class="credit-one-account"><div class="credit-one-account-head"><strong>' + esc(label) + '</strong><span class="badge">' + esc(account.account_name || "Credit Card") + '</span></div><div class="big">' + money(current) + '</div><span class="muted">Current balance</span><div class="credit-one-details"><span>Available credit <b>' + (available == null ? "—" : money(available)) + '</b></span><span>Credit limit <b>' + (limit == null ? "—" : money(limit)) + '</b></span></div></div>';
+        }).join("")
+      : '<span class="muted">No Credit One accounts connected yet.</span>';
+  }
 
   const card = document.querySelector("#accounts .account-category-grid article:first-child");
   const button = card?.querySelector("[data-action]");
