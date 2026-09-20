@@ -35,19 +35,27 @@ async function handleAuthSubmit(e) {
 
     let email = input;
 
-    // If input is a username (no '@'), fetch email via Supabase RPC function
+    // If input is a username (no '@'), resolve it to the Supabase Auth email.
     if (!input.includes("@")) {
-      const { data: lookedUpEmail, error: rpcError } = await sb.rpc("get_email_by_username", {
+      state.loginUsername = input;
+
+      // The RPC is kept in Supabase, but pre-login calls may be blocked for anon users.
+      // Use the known household username mapping as the pre-auth fallback.
+      const usernameMap = {
+        amcmullen1: "almcmullen@gmail.com",
+        jnally1: "akajnally@aol.com"
+      };
+
+      const { data: lookedUpEmail } = await sb.rpc("get_email_by_username", {
         p_username: input
       });
 
-      if (rpcError || !lookedUpEmail) {
+      email = lookedUpEmail || usernameMap[input] || "";
+
+      if (!email) {
         msg.textContent = "Username not found. Please check your username.";
         return;
       }
-      
-      email = lookedUpEmail;
-      state.loginUsername = input;
     }
 
     // Pass the retrieved email and password to Supabase Auth
