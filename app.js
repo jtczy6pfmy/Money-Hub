@@ -134,10 +134,10 @@ async function load() {
   state.savings = s.data || [];
   state.transactions = t.data || [];
   state.plans = pl.data || [];
-  render();
+  await render();
 }
 
-function render() {
+async function render() {
   if (state.profile?.username && $("authEmail")) $("authEmail").value = state.profile.username;
   $("authView").classList.add("hidden");
   $("appView").classList.remove("hidden");
@@ -146,7 +146,9 @@ function render() {
   $("householdNameInput").value = state.household.household_name;
   $("displayNameInput").value = state.profile.display_name || "";
   $("currencyInput").value = state.profile.currency_code || "USD";
-  dashboard(); bills(); income(); debt(); savings(); spending(); planner(); accounts(); reminders(); reports(); logins();
+  dashboard(); bills(); income(); debt(); savings(); spending(); planner(); reminders(); reports();
+  await logins();
+  accounts();
 }
 
 function dashboard() {
