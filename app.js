@@ -134,10 +134,10 @@ async function load() {
   state.savings = s.data || [];
   state.transactions = t.data || [];
   state.plans = pl.data || [];
-  render();
+  await render();
 }
 
-function render() {
+async function render() {
   if (state.profile?.username && $("authEmail")) $("authEmail").value = state.profile.username;
   $("authView").classList.add("hidden");
   $("appView").classList.remove("hidden");
@@ -146,7 +146,9 @@ function render() {
   $("householdNameInput").value = state.household.household_name;
   $("displayNameInput").value = state.profile.display_name || "";
   $("currencyInput").value = state.profile.currency_code || "USD";
-  dashboard(); bills(); income(); debt(); savings(); spending(); planner(); accounts(); reminders(); reports(); logins();
+  dashboard(); bills(); income(); debt(); savings(); spending(); planner(); reminders(); reports();
+  await logins();
+  accounts();
 }
 
 function dashboard() {
@@ -306,19 +308,6 @@ function accounts() {
   const balance = capital ? (capital.current_balance ?? capital.available_balance ?? 0) : 0;
   const balanceBox = $("capitalOneBalance");
   if (balanceBox) balanceBox.textContent = money(balance);
-
-  const concoraAccounts = state.accounts.filter(x => /concora/i.test(String(x.institution_name || "")));
-  const concoraAccountsBox = $("concoraAccounts");
-  if (concoraAccountsBox) {
-    concoraAccountsBox.innerHTML = concoraAccounts.length
-      ? concoraAccounts.map((account, index) => {
-          const current = account.current_balance ?? 0;
-          const available = account.available_balance;
-          const limit = account.credit_limit;
-          const label = concoraAccounts.length > 1 ? "Concora Account " + (index + 1) : "Concora";
-          return '<div class="credit-one-account"><div class="credit-one-account-head"><strong>' + esc(label) + '</strong><span class="badge">' + esc(account.account_name || "Credit Card") + '</span></div><div class="big">' + money(current) + '</div><span class="muted">Current balance</span><div class="credit-one-details"><span>Available credit <b>' + (available == null ? "—" : money(available)) + '</b></span><span>Credit limit <b>' + (limit == null ? "—" : money(limit)) + '</b></span></div></div>';
-        }).join("")
-      : '<span class="muted">No Concora accounts connected yet.</span>';
 
   const creditOneAccountsBox = $("creditOneAccounts");
   if (creditOneAccountsBox) {
@@ -528,21 +517,6 @@ document.addEventListener("click", async e => {
       } catch (err) {
         console.error("Credit One connection check failed", err);
         toast(err?.message || "Unable to connect Credit One.");
-      }
-      return;
-    }
-    if (action === "sync-concora") {
-      try {
-        const status = await plaidCall("status");
-        const linked = (status.items || []).some(x => /concora/i.test(String(x.institution_name || "")));
-        if (!linked) {
-          await connectPlaidAccount({ institutionName: "Concora" });
-        } else {
-          await syncPlaidAccounts();
-        }
-      } catch (err) {
-        console.error("Concora connection check failed", err);
-        toast(err?.message || "Unable to connect Concora.");
       }
       return;
     }
