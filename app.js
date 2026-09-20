@@ -316,7 +316,7 @@ function accounts() {
   const creditOneCard = document.querySelector("#accounts .account-category-grid article:nth-child(2)");
   const creditOneButton = creditOneCard?.querySelector("[data-action]");
   if (creditOneButton) {
-    creditOneButton.textContent = "↻ Sync Credit One";
+    creditOneButton.textContent = "↗ Connect Credit One";
     creditOneButton.disabled = false;
     creditOneButton.classList.add("primary");
     creditOneButton.classList.remove("ghost");
