@@ -534,7 +534,18 @@ document.addEventListener("click", async e => {
       return;
     }
     if (action === "sync-concora") {
-      await syncPlaidAccounts();
+      try {
+        const status = await plaidCall("status");
+        const linked = (status.items || []).some(x => /concora/i.test(String(x.institution_name || "")));
+        if (!linked) {
+          await connectPlaidAccount({ institutionName: "Concora" });
+        } else {
+          await syncPlaidAccounts();
+        }
+      } catch (err) {
+        console.error("Concora connection check failed", err);
+        toast(err?.message || "Unable to connect Concora.");
+      }
       return;
     }
     if (action === "sync-capital-one") {
