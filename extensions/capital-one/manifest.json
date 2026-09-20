@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Money Hub - Capital One Sync",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Syncs the visible Capital One balance to Money Hub.",
   "permissions": [
-    "tabs"
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "https://*.capitalone.com/*",
