@@ -102,20 +102,13 @@ function range() {
 }
 
 async function load() {
-  const sharedHouseholdId = "6f148d28-27fb-4fb1-8cdd-10e4369ad3a5";
-  const { data: m, error: me } = await sb.from("finance_household_members").select("household_id,role").eq("user_id", state.user.id).eq("household_id", sharedHouseholdId).limit(1);
+  const { data: m, error: me } = await sb.from("finance_household_members").select("household_id,role").eq("user_id", state.user.id).limit(1);
   if (me) throw me;
-  if (!m?.length) {
-    const { data: h, error } = await sb.from("finance_households").select("*").eq("id", sharedHouseholdId).single();
-    if (error) throw error;
-    const { error: joinError } = await sb.from("finance_household_members").upsert({ household_id: sharedHouseholdId, user_id: state.user.id, role: "member" }, { onConflict: "household_id,user_id" });
-    if (joinError) throw joinError;
-    state.household = h;
-  } else {
-    const { data: h, error } = await sb.from("finance_households").select("*").eq("id", sharedHouseholdId).single();
-    if (error) throw error;
-    state.household = h;
-  }
+  if (!m?.length) throw new Error("No Money Hub household is assigned to this account.");
+  const householdId = m[0].household_id;
+  const { data: h, error } = await sb.from("finance_households").select("*").eq("id", householdId).single();
+  if (error) throw error;
+  state.household = h;
   const hid = state.household.id;
   const [p, a, b, i, d, s, t, pl] = await Promise.all([
     sb.from("finance_profiles").select("*").eq("user_id", state.user.id).maybeSingle(),
