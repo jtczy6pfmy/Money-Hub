@@ -185,10 +185,26 @@ function spending() { $("spendingList").innerHTML = table(["Date", "Description"
 function planner() { $("plannerList").innerHTML = state.plans.map(x => '<article class="account-card"><span class="badge">Paycheck</span><h3>' + esc(x.source_name || "Paycheck") + '</h3><div class="big">' + money(x.expected_amount) + '</div><span class="muted">' + esc(x.paycheck_date) + '</span></article>').join("") || '<div class="panel"><span class="muted">Create a paycheck plan to assign money before payday.</span></div>'; }
 
 async function plaidCall(action, extra = {}) {
-  const { data, error } = await sb.functions.invoke("plaid", { body: { action, ...extra } });
-  if (error) throw error;
+  const { data, error } = await sb.functions.invoke("plaid", {
+    body: { action, ...extra }
+  });
+  if (error) {
+    let message = error.message || "Plaid request failed.";
+    try {
+      if (error.context) {
+        const body = await error.context.json();
+        if (body?.error) message = body.error;
+      }
+    } catch (_) {}
+    throw new Error(message);
+  }
   if (data?.error) throw new Error(data.error);
   return data;
+}
+
+async function getPlaidStatus() {
+  const data = await plaidCall("status");
+  return Array.isArray(data?.items) ? data.items : [];
 }
 
 async function connectPlaidAccount() {
