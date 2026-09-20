@@ -112,7 +112,7 @@ async function load() {
   state.household = h[0];
   const hid = state.household.id;
   const [p, a, b, i, d, s, t, pl] = await Promise.all([
-    sb.from("finance_profiles").select("*").eq("user_id", state.user.id).maybeSingle(),
+    sb.from("finance_profiles").select("*").eq("user_id", state.user.id).limit(1),
     sb.from("finance_accounts").select("*").eq("household_id", hid).eq("is_active", true).order("institution_name"),
     sb.from("finance_bills").select("*").eq("household_id", hid).order("due_date"),
     sb.from("finance_income").select("*").eq("household_id", hid).order("income_date", { ascending: false }),
@@ -121,7 +121,7 @@ async function load() {
     sb.from("finance_transactions").select("*").eq("household_id", hid).order("transaction_date", { ascending: false }).limit(100),
     sb.from("finance_paycheck_plans").select("*").eq("household_id", hid).order("paycheck_date", { ascending: false })
   ]);
-  state.profile = p.data || { currency_code: "USD" };
+  state.profile = p.data?.[0] || { currency_code: "USD" };
   if (!state.profile.username && state.loginUsername) {
     const pr = { user_id: state.user.id, household_id: state.household.id, username: state.loginUsername };
     const ur = await sb.from("finance_profiles").upsert(pr, { onConflict: "user_id" });
