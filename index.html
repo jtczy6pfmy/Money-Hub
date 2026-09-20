@@ -16,4 +16,82 @@
 <section id="reports" class="section"><div class="section-head"><div><h1>Reports</h1><p>Monthly household financial picture.</p></div></div><div class="grid two"><article class="panel"><h3>Monthly cash flow</h3><div id="reportCashflow"></div></article><article class="panel"><h3>Debt vs. savings</h3><div id="reportDebtSavings"></div></article></div></section>
 <section id="reminders" class="section"><div class="section-head"><div><h1>Reminders</h1><p>Important dates that should not sneak up on you.</p></div></div><div id="remindersList" class="cards-grid"></div></section>
 <section id="settings" class="section"><div class="section-head"><div><h1>Settings</h1><p>Household and account configuration.</p></div></div><div class="settings-grid"><article class="panel"><h3>Household</h3><label>Household name<input id="householdNameInput"></label><button class="primary" id="saveHousehold">Save</button></article><article class="panel"><h3>Your profile</h3><label>Display name<input id="displayNameInput"></label><label>Currency<select id="currencyInput"><option>USD</option><option>CAD</option><option>EUR</option><option>GBP</option></select></label><button class="primary" id="saveProfile">Save profile</button></article></div></section></main></div>
-<div id="modal" class="modal hidden"><div class="modal-backdrop"></div><div class="modal-card"><div class="modal-head"><h3 id="modalTitle">Add</h3><button id="modalClose" class="icon-button">×</button></div><form id="modalForm"><div id="modalFields"></div><div class="modal-actions"><button type="button" class="ghost" id="modalCancel">Cancel</button><button class="primary">Save</button></div></form></div></div><div id="toast" class="toast"></div><script src="./app.js?v=20260920-3"></script></body></html>
+<div id="modal" class="modal hidden"><div class="modal-backdrop"></div><div class="modal-card"><div class="modal-head"><h3 id="modalTitle">Add</h3><button id="modalClose" class="icon-button">×</button></div><form id="modalForm"><div id="modalFields"></div><div class="modal-actions"><button type="button" class="ghost" id="modalCancel">Cancel</button><button class="primary">Save</button></div></form></div></div><div id="toast" class="toast"></div><script src="./app.js?v=20260920-3"></script>
+<script>
+async function handleAuthSubmit(e) {
+  if (e) e.preventDefault();
+  const msg = $("authMessage"), btn = $("authSubmit");
+  msg.textContent = state.authMode === "signin" ? "Signing in…" : "Creating account…";
+  btn.disabled = true;
+
+  try {
+    const input = $("authEmail").value.trim().toLowerCase();
+    const password = $("authPassword").value;
+
+    if (!input || !password) {
+      msg.textContent = "Enter your username and password.";
+      return;
+    }
+
+    let email = input;
+
+    // If input is a username (no '@'), fetch email via Supabase RPC function
+    if (!input.includes("@")) {
+      const { data: lookedUpEmail, error: rpcError } = await sb.rpc("get_email_by_username", {
+        p_username: input
+      });
+
+      if (rpcError || !lookedUpEmail) {
+        msg.textContent = "Username not found. Please check your username.";
+        return;
+      }
+      
+      email = lookedUpEmail;
+      state.loginUsername = input;
+    }
+
+    // Pass the retrieved email and password to Supabase Auth
+    const r = state.authMode === "signin" 
+      ? await sb.auth.signInWithPassword({ email, password })
+      : await sb.auth.signUp({ 
+          email, 
+          password,
+          options: { data: { username: input } } 
+        });
+
+    if (r.error) {
+      msg.textContent = r.error.message;
+      return;
+    }
+
+    if (!r.data?.user) {
+      msg.textContent = state.authMode === "signup"
+        ? "Account created! You can now sign in."
+        : "No user returned from authentication.";
+      return;
+    }
+
+    state.user = r.data.user;
+
+    try {
+      await load();
+      msg.textContent = "";
+    } catch (err) {
+      msg.textContent = "Signed in, but Money Hub could not load: " + (err?.message || "Unknown error");
+    }
+  } catch (err) {
+    msg.textContent = err?.message || "Unable to sign in. Please try again.";
+  } finally {
+    btn.disabled = false;
+  }
+}
+window.handleAuthSubmit = handleAuthSubmit;
+
+// Replace the handler installed by app.js with this index.html handler.
+const authForm = $("authForm");
+if (authForm) {
+  const cleanAuthForm = authForm.cloneNode(true);
+  authForm.replaceWith(cleanAuthForm);
+  cleanAuthForm.addEventListener("submit", handleAuthSubmit);
+}
+</script></body></html>
