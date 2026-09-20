@@ -237,6 +237,45 @@ async function loadAccountsData() {
   state.accounts = data || [];
 }
 
+window.addEventListener("message", async (event) => {
+  if (event.source !== window || event.origin !== window.location.origin) return;
+  const msg = event.data;
+  if (!msg || msg.type !== "MONEY_HUB_CAPITAL_ONE_BALANCE") return;
+  const balance = Number(msg.balance);
+  if (!Number.isFinite(balance) || !state.user || !state.household) return;
+  try {
+    const existing = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
+    const values = {
+      institution_name: "Capital One",
+      account_name: existing?.account_name || "Capital One",
+      account_type: "Credit Card",
+      current_balance: balance,
+      available_balance: existing?.available_balance ?? null,
+      credit_limit: existing?.credit_limit ?? null,
+      interest_rate: existing?.interest_rate ?? null,
+      minimum_payment: existing?.minimum_payment ?? 0,
+      due_date: existing?.due_date ?? null,
+      notes: existing?.notes ?? null,
+      household_id: state.household.id,
+      user_id: state.user.id,
+      is_active: true,
+      connection_provider: "capital-one-browser-extension",
+      last_updated_at: new Date().toISOString(),
+      balance_updated_at: new Date().toISOString()
+    };
+    const result = existing?.id
+      ? await sb.from("finance_accounts").update(values).eq("id", existing.id)
+      : await sb.from("finance_accounts").insert(values);
+    if (result.error) throw result.error;
+    await loadAccountsData();
+    accounts();
+    if ($("accounts")?.classList.contains("active")) toast("Capital One balance synced");
+  } catch (err) {
+    console.error("Capital One sync failed", err);
+    toast(err?.message || "Unable to sync Capital One");
+  }
+});
+
 function accounts() {
   const capital = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
   const balance = capital ? (capital.current_balance ?? capital.available_balance ?? 0) : 0;
@@ -415,6 +454,11 @@ document.addEventListener("click", e => {
   if (a) {
     e.preventDefault();
     const action = a.dataset.action;
+    if (action === "sync-capital-one") {
+      window.postMessage({ type: "MONEY_HUB_REQUEST_CAPITAL_ONE_SYNC" }, window.location.origin);
+      toast("Sync request sent to Capital One extension");
+      return;
+    }
     openModal(action.startsWith("add-") ? action.slice(4) : action);
     return;
   }
