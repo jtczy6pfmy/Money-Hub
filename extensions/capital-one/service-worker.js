@@ -58,19 +58,9 @@ async function forwardBalance(msg) {
 function readVisibleBalance(tabId) {
   const func = () => {
     function readBalance() {
-    const selectors = [
-      ".primary-detail__balance__dollar",
-      "[class*='primary-detail__balance__dollar']"
-    ];
-
-    const parse = (raw) => {
-      const text = String(raw || "").replace(/\u00a0/g, " ").trim();
-      if (!text) return null;
-      const match = text.match(/-?\$?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/);
-      if (!match) return null;
-      const value = Number(match[1].replace(/,/g, ""));
-      return Number.isFinite(value) ? value : null;
-    };
+    const nodes = Array.from(document.querySelectorAll(
+      ".primary-detail__balance__dollar, [class*='primary-detail__balance__dollar']"
+    ));
 
     const visible = (el) => {
       const style = getComputedStyle(el);
@@ -82,40 +72,37 @@ function readVisibleBalance(tabId) {
         rect.height > 0;
     };
 
-    const exact = Array.from(document.querySelectorAll(selectors.join(",")))
-      .filter(visible)
-      .map(el => ({
-        value: parse(el.innerText || el.textContent || el.getAttribute("aria-label") || ""),
-        el
-      }))
-      .filter(x => x.value !== null);
+    const parse = (raw) => {
+      const text = String(raw || "").replace(/\u00a0/g, " ").trim();
+      const matches = text.match(/-?\$?\s*[0-9][0-9,]*(?:\.\d{1,2})?/g) || [];
+      const values = matches.map(x => Number(x.replace(/[^0-9.-]/g, "")))
+        .filter(Number.isFinite);
+      return values.length ? values : [];
+    };
 
-    // Capital One can render a zero/placeholder balance before the real
-    // balance is painted. Prefer a non-zero value from the exact balance
-    // element when one is available.
-    const nonZeroExact = exact.filter(x => x.value !== 0);
-    if (nonZeroExact.length) return nonZeroExact[0].value;
-    if (exact.length) return exact[0].value;
-
-    // Fallback: inspect nearby visible text for a currency amount.
-    const candidates = [];
-    const all = Array.from(document.querySelectorAll("body *")).filter(visible);
-    for (const el of all) {
-      const label = [
+    // Read each representation separately. Capital One can expose a
+    // placeholder through innerText while the actual amount remains in
+    // textContent (for example, the element can visually show 0 while its
+    // DOM text contains the account balance).
+    const values = [];
+    for (const el of nodes.filter(visible)) {
+      const sources = [
+        el.textContent,
+        el.innerText,
         el.getAttribute("aria-label"),
-        el.getAttribute("title"),
-        el.innerText
-      ].filter(Boolean).join(" ");
-      if (!/balance|current balance/i.test(label)) continue;
-      const matches = label.match(/-?\$\s*[0-9][0-9,]*(?:\.\d{1,2})?/g) || [];
-      for (const raw of matches) {
-        const value = parse(raw);
-        if (value !== null) candidates.push(value);
+        el.getAttribute("title")
+      ];
+
+      for (const source of sources) {
+        values.push(...parse(source));
       }
     }
 
-    const nonZero = candidates.filter(v => v !== 0);
-    return nonZero.length ? nonZero[0] : (candidates[0] ?? null);
+    const nonZero = values.filter(v => v !== 0);
+    if (nonZero.length) return nonZero[0];
+    if (values.length) return values[0];
+
+    return null;
   }
     return readBalance();
   };
