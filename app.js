@@ -6,6 +6,8 @@ function spending(){$("spendingList").innerHTML=table(["Date","Description","Cat
 }
 
 function accounts(){
+  const grid=$("accountsGrid");
+  if(!grid)return;
   const accountRows=state.accounts.filter(x=>x.is_active!==false&&String(x.account_type||"").toLowerCase()==="credit card");
   const cards=accountRows.map(p=>{
     const balance=Number(p.current_balance||0);
