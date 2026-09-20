@@ -134,7 +134,7 @@ async function load() {
   state.savings = s.data || [];
   state.transactions = t.data || [];
   state.plans = pl.data || [];
-  await render();
+  render();
 }
 
 async function render() {
@@ -146,9 +146,7 @@ async function render() {
   $("householdNameInput").value = state.household.household_name;
   $("displayNameInput").value = state.profile.display_name || "";
   $("currencyInput").value = state.profile.currency_code || "USD";
-  dashboard(); bills(); income(); debt(); savings(); spending(); planner(); reminders(); reports();
-  await logins();
-  accounts();
+  dashboard(); bills(); income(); debt(); savings(); spending(); planner(); accounts(); reminders(); reports(); logins();
 }
 
 function dashboard() {
