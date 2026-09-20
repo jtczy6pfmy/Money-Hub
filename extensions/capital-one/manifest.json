@@ -1,24 +1,41 @@
 {
   "manifest_version": 3,
   "name": "Money Hub - Capital One Sync",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Syncs the visible Capital One balance to Money Hub.",
-  "permissions": ["tabs"],
+  "permissions": [
+    "tabs"
+  ],
   "host_permissions": [
     "https://*.capitalone.com/*",
     "https://jtczy6pfmy.github.io/Money-Hub/*"
   ],
-  "background": { "service_worker": "service-worker.js" },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://*.capitalone.com/*"],
-      "js": ["capital-one.js"],
+      "matches": [
+        "https://*.capitalone.com/*"
+      ],
+      "js": [
+        "capital-one.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://jtczy6pfmy.github.io/Money-Hub/*"],
-      "js": ["money-hub-bridge.js"],
+      "matches": [
+        "https://jtczy6pfmy.github.io/Money-Hub/*"
+      ],
+      "js": [
+        "money-hub-bridge.js"
+      ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "money-hub-capital-one-sync@jtczy6pfmy.github.io"
+    }
+  }
 }
