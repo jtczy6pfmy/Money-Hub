@@ -12,10 +12,10 @@
     const balance = readBalance();
     if (balance === null || (!force && balance === last)) return;
     last = balance;
-    chrome.runtime.sendMessage({ type: "CAPITAL_ONE_BALANCE", balance });
+    (typeof browser !== "undefined" ? browser : chrome).runtime.sendMessage({ type: "CAPITAL_ONE_BALANCE", balance });
   }
 
-  chrome.runtime.onMessage.addListener((msg) => {
+  (typeof browser !== "undefined" ? browser : chrome).runtime.onMessage.addListener((msg) => {
     if (msg?.type === "REQUEST_CAPITAL_ONE_SYNC") sync(true);
   });
 
