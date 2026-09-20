@@ -106,9 +106,10 @@ async function load() {
   if (me) throw me;
   if (!m?.length) throw new Error("No Money Hub household is assigned to this account.");
   const householdId = m[0].household_id;
-  const { data: h, error } = await sb.from("finance_households").select("*").eq("id", householdId).single();
+  const { data: h, error } = await sb.from("finance_households").select("*").eq("id", householdId).limit(1);
   if (error) throw error;
-  state.household = h;
+  if (!h?.length) throw new Error("Money Hub household could not be loaded.");
+  state.household = h[0];
   const hid = state.household.id;
   const [p, a, b, i, d, s, t, pl] = await Promise.all([
     sb.from("finance_profiles").select("*").eq("user_id", state.user.id).maybeSingle(),
