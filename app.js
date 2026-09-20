@@ -6,7 +6,7 @@ function spending(){$("spendingList").innerHTML=table(["Date","Description","Cat
   state.accounts=data||[];
 }
 
-function accounts(){
+function accounts(){const capitalOne=state.accounts.find(x=>String(x.institution_name||"").toLowerCase().includes("capital one")||String(x.account_name||"").toLowerCase().includes("capital one"));const bal=$("capitalOneBalance");if(bal)bal.textContent=capitalOne?money(capitalOne.current_balance):"$0.00";
   const grid=$("accountsGrid");
   if(!grid)return;
   const accountRows=state.accounts.filter(x=>x.is_active!==false&&String(x.account_type||"").toLowerCase()==="credit card");
