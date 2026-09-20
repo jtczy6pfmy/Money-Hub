@@ -24,3 +24,5 @@ The browser uses the Supabase publishable key only. Never place a service-role o
 - Household member invitations
 - Edit/delete flows
 - Charts, debt payoff calculator and automated reminders
+
+<!-- Pages deployment retrigger -->
