@@ -147,17 +147,30 @@ async function requestCapitalOneSync() {
         const url = new URL(tab.url);
         if (!url.hostname.endsWith("capitalone.com")) continue;
 
+        let response = null;
         try {
-          await api.tabs.sendMessage(tab.id, { type: "REQUEST_CAPITAL_ONE_SYNC" });
+          response = await api.tabs.sendMessage(tab.id, { type: "REQUEST_CAPITAL_ONE_SYNC" });
         } catch (_) {}
 
-        const result = await readVisibleBalance(tab.id);
-        const balance = result?.[0]?.result ?? result?.[0];
+        // The Capital One content script is the authoritative reader.
+        // Do not run a second DOM read here, because Capital One can expose
+        // a hidden/placeholder $0 element to executeScript while the content
+        // script sees the actual visible balance.
+        const balance = Number(response?.balance);
 
         if (Number.isFinite(balance)) {
+          return;
+        }
+
+        // Only use the direct DOM fallback if the content script did not
+        // respond with a usable balance.
+        const result = await readVisibleBalance(tab.id);
+        const fallbackBalance = result?.[0]?.result ?? result?.[0];
+
+        if (Number.isFinite(fallbackBalance)) {
           await forwardBalance({
             type: "CAPITAL_ONE_BALANCE",
-            balance
+            balance: fallbackBalance
           });
         }
       } catch (err) {
