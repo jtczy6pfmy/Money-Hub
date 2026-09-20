@@ -137,7 +137,7 @@ async function load() {
   render();
 }
 
-async function render() {
+function render() {
   if (state.profile?.username && $("authEmail")) $("authEmail").value = state.profile.username;
   $("authView").classList.add("hidden");
   $("appView").classList.remove("hidden");
