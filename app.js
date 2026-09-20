@@ -238,19 +238,26 @@ async function loadAccountsData() {
 }
 
 function accounts() {
-  const vaultCards = state.logins.filter(x => String(x.account_type || "").toLowerCase() === "credit card");
-  const plaidCards = state.accounts.filter(x => String(x.account_type || "").toLowerCase() === "credit card");
-  const cards = vaultCards.map(v => {
-    const raw = String(v.account_number || "").replace(/\s+/g, ""), last4 = raw.length >= 4 ? raw.slice(-4) : "";
-    const p = plaidCards.find(a => last4 && String(a.account_mask || "").endsWith(last4)) || plaidCards.find(a => /capital one/i.test(String(a.institution_name || "")));
-    return { ...v, plaid: p };
-  });
-  if (!cards.length && plaidCards.length) cards.push(...plaidCards.map(p => ({ account_name: p.account_name, website_url: "Capital One", account_number: "", username: "", phone_number: "", plaid: p })));
-  $("accountsGrid").innerHTML = cards.map(x => {
-    const raw = String(x.account_number || "").replace(/\s+/g, ""), last4 = raw.length >= 4 ? raw.slice(-4) : "";
-    const p = x.plaid;
-    return '<article class="account-card"><span class="badge">Credit Card</span><h3>' + esc(x.account_name || p?.account_name || "Capital One") + '</h3><span class="muted">' + esc(x.website_url || p?.institution_name || "Capital One") + '</span><div class="vault-row"><span>Card number</span><b>•••• •••• •••• ' + esc(last4 || p?.account_mask || "—") + '</b></div><div class="vault-row"><span>Current balance</span><b>' + money(p?.current_balance || 0) + '</b></div><div class="vault-row"><span>Available credit</span><b>' + money(p?.available_balance || 0) + '</b></div><div class="vault-row"><span>Credit limit</span><b>' + money(p?.credit_limit || 0) + '</b></div><div class="vault-row"><span>Last synced</span><b>' + esc(p?.balance_updated_at ? new Date(p.balance_updated_at).toLocaleString() : "Not connected") + '</b></div><div class="vault-row"><span>Connection</span><b>' + esc(p ? "Plaid" : "Vault only") + '</b></div></article>';
-  }).join("") || (plaidCards.length === 0 ? '<div class="panel"><strong>Capital One is not connected yet</strong><p class="muted">Connect Capital One once. After that, Money Hub will automatically show the card balance here.</p><button class="primary" data-action="connect-capital-one">Connect Capital One</button></div>' : '');
+  const capital = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
+  const balance = capital ? (capital.current_balance ?? capital.available_balance ?? 0) : 0;
+  const balanceBox = $("capitalOneBalance");
+  if (balanceBox) balanceBox.textContent = money(balance);
+
+  const card = document.querySelector("#accounts .account-category-grid article:first-child");
+  const button = card?.querySelector("[data-action]");
+  if (button) {
+    if (capital) {
+      button.textContent = "Connected";
+      button.disabled = true;
+      button.classList.remove("primary");
+      button.classList.add("ghost");
+    } else {
+      button.textContent = "Connect Capital One";
+      button.disabled = false;
+      button.classList.add("primary");
+      button.classList.remove("ghost");
+    }
+  }
 }
 
 function reminders() { $("remindersList").innerHTML = state.bills.filter(x => !x.is_paid).slice(0, 8).map(x => '<article class="account-card"><span class="badge">Bill due</span><h3>' + esc(x.bill_name) + '</h3><div class="big">' + money(x.amount) + '</div><span class="muted">' + esc(x.due_date || x.due_day) + '</span></article>').join("") || '<div class="panel"><span class="muted">No reminders yet.</span></div>'; }
@@ -393,6 +400,11 @@ $("signOut").onclick = async () => { await sb.auth.signOut(); location.reload();
 $("modalClose").onclick = $("modalCancel").onclick = () => $("modal").classList.add("hidden");
 $("modalForm").onsubmit = saveModal;
 $("refresh").onclick = refreshPlaidBalances;
+$("refreshAccounts").onclick = async () => {
+  await loadAccountsData();
+  accounts();
+  toast("Accounts refreshed");
+};
 
 document.addEventListener("click", e => {
   let n = e.target.closest("[data-section]");
