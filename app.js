@@ -184,53 +184,6 @@ async function logins() {
 function spending() { $("spendingList").innerHTML = table(["Date", "Description", "Category", "Account", "Amount"], state.transactions.map(x => '<tr><td>' + esc(x.transaction_date) + '</td><td>' + esc(x.description) + '</td><td>' + esc(x.category) + '</td><td>' + esc(x.account_name) + '</td><td>' + money(x.amount) + '</td></tr>')); }
 function planner() { $("plannerList").innerHTML = state.plans.map(x => '<article class="account-card"><span class="badge">Paycheck</span><h3>' + esc(x.source_name || "Paycheck") + '</h3><div class="big">' + money(x.expected_amount) + '</div><span class="muted">' + esc(x.paycheck_date) + '</span></article>').join("") || '<div class="panel"><span class="muted">Create a paycheck plan to assign money before payday.</span></div>'; }
 
-async function plaidCall(action, extra = {}) {
-  const { data, error } = await sb.functions.invoke("plaid", { body: { action, ...extra } });
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
-  return data;
-}
-
-async function connectPlaidAccount() {
-  try {
-    if (!window.Plaid) throw new Error("Plaid Link did not load. Please refresh the page and try again.");
-    toast("Opening secure bank connection…");
-    const data = await plaidCall("create_link_token");
-    const handler = window.Plaid.create({
-      token: data.link_token,
-      onSuccess: async (public_token) => {
-        try {
-          toast("Finishing secure connection…");
-          await plaidCall("exchange_public_token", { public_token });
-          await load();
-          show("accounts");
-          toast("Account connected and balance synced");
-        } catch (err) {
-          toast(err?.message || "Unable to finish the bank connection.");
-        }
-      },
-      onExit: (err) => {
-        if (err?.error_code) console.warn("Plaid Link exit", err);
-      }
-    });
-    handler.open();
-  } catch (err) {
-    toast(err?.message || "Unable to start the bank connection.");
-  }
-}
-
-async function refreshPlaidBalances() {
-  try {
-    toast("Refreshing connected account balances…");
-    await plaidCall("refresh");
-    await load();
-    toast("Balances refreshed");
-  } catch (err) {
-    toast(err?.message || "Unable to refresh connected accounts.");
-    await load();
-  }
-}
-
 async function loadAccountsData() {
   const { data, error } = await sb.from("finance_accounts").select("*").eq("household_id", state.household.id).eq("is_active", true);
   if (error) { console.error(error); state.accounts = []; return; }
