@@ -4,13 +4,11 @@
   "version": "1.0.0",
   "description": "Reads the Capital One balance from the page you are already viewing and sends it to Money Hub.",
   "permissions": ["tabs"],
-  "host_permissions": ["https://*.capitalone.com/*"],
-  "content_scripts": [{
-    "matches": ["https://*.capitalone.com/*"],
-    "js": ["content.js"],
-    "run_at": "document_idle"
-  }],
-  "action": {
-    "default_title": "Sync Capital One to Money Hub"
-  }
+  "host_permissions": ["https://*.capitalone.com/*", "https://jtczy6pfmy.github.io/Money-Hub/*"],
+  "background": {"service_worker": "service-worker.js"},
+  "content_scripts": [
+    {"matches": ["https://*.capitalone.com/*"], "js": ["content.js"], "run_at": "document_idle"},
+    {"matches": ["https://jtczy6pfmy.github.io/Money-Hub/*"], "js": ["app-bridge.js"], "run_at": "document_idle"}
+  ],
+  "action": {"default_title": "Sync Capital One to Money Hub"}
 }
