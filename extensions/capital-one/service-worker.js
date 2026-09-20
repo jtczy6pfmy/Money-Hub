@@ -57,21 +57,25 @@ async function forwardBalance(msg) {
 
 function readVisibleBalance(tabId) {
   const func = () => {
-    const selectors = [
-      ".primary-detail__balance__dollar",
-      "[class*='primary-detail__balance__dollar']"
-    ];
+    const nodes = Array.from(document.querySelectorAll(
+      ".primary-detail__balance__dollar, [class*='primary-detail__balance__dollar']"
+    ));
 
-    let el = null;
-    for (const selector of selectors) {
-      el = document.querySelector(selector);
-      if (el) break;
-    }
+    const visible = nodes.filter(el => {
+      const style = getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      return style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        rect.width > 0 &&
+        rect.height > 0;
+    });
 
-    if (!el) return null;
+    const candidates = visible.map(el => {
+      const value = Number((el.textContent || "").trim().replace(/[^0-9.-]/g, ""));
+      return Number.isFinite(value) ? value : null;
+    }).filter(v => v !== null);
 
-    const value = Number((el.textContent || "").replace(/[^0-9.-]/g, ""));
-    return Number.isFinite(value) ? value : null;
+    return candidates.length ? candidates[0] : null;
   };
 
   if (api.tabs?.executeScript) {
