@@ -2,26 +2,64 @@
   let last = null;
 
   function readBalance() {
-    const nodes = Array.from(document.querySelectorAll(
-      ".primary-detail__balance__dollar, [class*='primary-detail__balance__dollar']"
-    ));
+    const selectors = [
+      ".primary-detail__balance__dollar",
+      "[class*='primary-detail__balance__dollar']"
+    ];
 
-    const visible = nodes.filter(el => {
+    const parse = (raw) => {
+      const text = String(raw || "").replace(/\u00a0/g, " ").trim();
+      if (!text) return null;
+      const match = text.match(/-?\$?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/);
+      if (!match) return null;
+      const value = Number(match[1].replace(/,/g, ""));
+      return Number.isFinite(value) ? value : null;
+    };
+
+    const visible = (el) => {
       const style = getComputedStyle(el);
       const rect = el.getBoundingClientRect();
       return style.display !== "none" &&
         style.visibility !== "hidden" &&
+        style.opacity !== "0" &&
         rect.width > 0 &&
         rect.height > 0;
-    });
+    };
 
-    const candidates = visible.map(el => {
-      const raw = (el.textContent || "").trim();
-      const value = Number(raw.replace(/[^0-9.-]/g, ""));
-      return Number.isFinite(value) ? value : null;
-    }).filter(v => v !== null);
+    const exact = Array.from(document.querySelectorAll(selectors.join(",")))
+      .filter(visible)
+      .map(el => ({
+        value: parse(el.innerText || el.textContent || el.getAttribute("aria-label") || ""),
+        el
+      }))
+      .filter(x => x.value !== null);
 
-    return candidates.length ? candidates[0] : null;
+    // Capital One can render a zero/placeholder balance before the real
+    // balance is painted. Prefer a non-zero value from the exact balance
+    // element when one is available.
+    const nonZeroExact = exact.filter(x => x.value !== 0);
+    if (nonZeroExact.length) return nonZeroExact[0].value;
+    if (exact.length) return exact[0].value;
+
+    // Fallback: inspect nearby visible text for a currency amount.
+    const candidates = [];
+    const all = Array.from(document.querySelectorAll("body *")).filter(visible);
+    for (const el of all) {
+      const label = [
+        el.getAttribute("aria-label"),
+        el.getAttribute("title"),
+        el.innerText
+      ].filter(Boolean).join(" ");
+      if (!/balance|current balance/i.test(label)) continue;
+      const matches = label.match(/-?\$\s*[0-9][0-9,]*(?:\.\d{1,2})?/g) || [];
+      for (const raw of matches) {
+        const value = parse(raw);
+        if (value !== null) candidates.push(value);
+      }
+    }
+
+    const nonZero = candidates.filter(v => v !== 0);
+    return nonZero.length ? nonZero[0] : (candidates[0] ?? null);
   }
 
   function sync(force = false) {
