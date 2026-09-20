@@ -12,6 +12,9 @@
     last = balance;
     chrome.runtime.sendMessage({ type: "CAPITAL_ONE_BALANCE", balance });
   }
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === "REQUEST_CAPITAL_ONE_SYNC") sync();
+  });
   sync();
   new MutationObserver(sync).observe(document.documentElement, {subtree:true, childList:true, characterData:true});
   setInterval(sync, 5000);
