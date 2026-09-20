@@ -184,6 +184,53 @@ async function logins() {
 function spending() { $("spendingList").innerHTML = table(["Date", "Description", "Category", "Account", "Amount"], state.transactions.map(x => '<tr><td>' + esc(x.transaction_date) + '</td><td>' + esc(x.description) + '</td><td>' + esc(x.category) + '</td><td>' + esc(x.account_name) + '</td><td>' + money(x.amount) + '</td></tr>')); }
 function planner() { $("plannerList").innerHTML = state.plans.map(x => '<article class="account-card"><span class="badge">Paycheck</span><h3>' + esc(x.source_name || "Paycheck") + '</h3><div class="big">' + money(x.expected_amount) + '</div><span class="muted">' + esc(x.paycheck_date) + '</span></article>').join("") || '<div class="panel"><span class="muted">Create a paycheck plan to assign money before payday.</span></div>'; }
 
+async function plaidCall(action, extra = {}) {
+  const { data, error } = await sb.functions.invoke("plaid", { body: { action, ...extra } });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+async function connectPlaidAccount() {
+  try {
+    if (!window.Plaid) throw new Error("Plaid Link did not load. Please refresh the page and try again.");
+    toast("Opening secure bank connection…");
+    const data = await plaidCall("create_link_token");
+    const handler = window.Plaid.create({
+      token: data.link_token,
+      onSuccess: async (public_token) => {
+        try {
+          toast("Finishing secure connection…");
+          await plaidCall("exchange_public_token", { public_token });
+          await load();
+          show("accounts");
+          toast("Account connected and balance synced");
+        } catch (err) {
+          toast(err?.message || "Unable to finish the bank connection.");
+        }
+      },
+      onExit: (err) => {
+        if (err?.error_code) console.warn("Plaid Link exit", err);
+      }
+    });
+    handler.open();
+  } catch (err) {
+    toast(err?.message || "Unable to start the bank connection.");
+  }
+}
+
+async function refreshPlaidBalances() {
+  try {
+    toast("Refreshing connected account balances…");
+    await plaidCall("refresh");
+    await load();
+    toast("Balances refreshed");
+  } catch (err) {
+    toast(err?.message || "Unable to refresh connected accounts.");
+    await load();
+  }
+}
+
 async function loadAccountsData() {
   const { data, error } = await sb.from("finance_accounts").select("*").eq("household_id", state.household.id).eq("is_active", true);
   if (error) { console.error(error); state.accounts = []; return; }
@@ -228,6 +275,7 @@ const forms = {
 };
 
 function openModal(type) {
+  if (type === "connect-account" || type === "connect-capital-one") { connectPlaidAccount(); return; }
   if (type === "login" && !state.vaultUnlocked) { unlockVault().then(ok => { if (ok) openModal("login"); }); return; }
   let f = forms[type];
   $("modalTitle").textContent = "Add";
@@ -351,41 +399,12 @@ $("toggleAuth").onclick = () => {
 $("signOut").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 $("modalClose").onclick = $("modalCancel").onclick = () => $("modal").classList.add("hidden");
 $("modalForm").onsubmit = saveModal;
-$("refresh").onclick = refreshAccountsData;
-$("refreshAccounts").onclick = refreshAccountsData;
-
-window.addEventListener("message", async (event) => {
-  const d = event.data;
-  if (!d || d.source !== "money-hub-extension" || d.type !== "CAPITAL_ONE_BALANCE") return;
-  const balance = Number(d.balance);
-  if (!Number.isFinite(balance) || !state.user || !state.household) return;
-  const existing = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
-  const payload = {
-    institution_name: "Capital One",
-    account_name: d.accountName || existing?.account_name || "Capital One",
-    account_type: "Credit Card",
-    current_balance: balance,
-    available_balance: existing?.available_balance ?? null,
-    credit_limit: existing?.credit_limit ?? null,
-    interest_rate: existing?.interest_rate ?? null,
-    minimum_payment: existing?.minimum_payment ?? 0,
-    due_date: existing?.due_date ?? null,
-    notes: existing?.notes ?? null,
-    is_active: true,
-    household_id: state.household.id,
-    user_id: state.user.id,
-    connection_provider: "browser-extension",
-    balance_updated_at: new Date().toISOString(),
-    last_updated_at: new Date().toISOString()
-  };
-  const result = existing
-    ? await sb.from("finance_accounts").update(payload).eq("id", existing.id)
-    : await sb.from("finance_accounts").insert(payload);
-  if (result.error) { toast(result.error.message); return; }
+$("refresh").onclick = refreshPlaidBalances;
+$("refreshAccounts").onclick = async () => {
   await loadAccountsData();
   accounts();
-  toast("Capital One balance updated");
-});
+  toast("Accounts refreshed");
+};
 
 document.addEventListener("click", e => {
   let n = e.target.closest("[data-section]");
