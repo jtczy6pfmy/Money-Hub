@@ -285,17 +285,10 @@ function accounts() {
   const card = document.querySelector("#accounts .account-category-grid article:first-child");
   const button = card?.querySelector("[data-action]");
   if (button) {
-    if (capital) {
-      button.textContent = "Connected";
-      button.disabled = true;
-      button.classList.remove("primary");
-      button.classList.add("ghost");
-    } else {
-      button.textContent = "Add Capital One";
-      button.disabled = false;
-      button.classList.add("primary");
-      button.classList.remove("ghost");
-    }
+    button.textContent = "↻ Sync Capital One";
+    button.disabled = false;
+    button.classList.add("primary");
+    button.classList.remove("ghost");
   }
 }
 
