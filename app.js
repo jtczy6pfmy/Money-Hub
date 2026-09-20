@@ -309,6 +309,19 @@ function accounts() {
   const balanceBox = $("capitalOneBalance");
   if (balanceBox) balanceBox.textContent = money(balance);
 
+  const concoraAccounts = state.accounts.filter(x => /concora/i.test(String(x.institution_name || "")));
+  const concoraAccountsBox = $("concoraAccounts");
+  if (concoraAccountsBox) {
+    concoraAccountsBox.innerHTML = concoraAccounts.length
+      ? concoraAccounts.map((account, index) => {
+          const current = account.current_balance ?? 0;
+          const available = account.available_balance;
+          const limit = account.credit_limit;
+          const label = concoraAccounts.length > 1 ? "Concora Account " + (index + 1) : "Concora";
+          return '<div class="credit-one-account"><div class="credit-one-account-head"><strong>' + esc(label) + '</strong><span class="badge">' + esc(account.account_name || "Credit Card") + '</span></div><div class="big">' + money(current) + '</div><span class="muted">Current balance</span><div class="credit-one-details"><span>Available credit <b>' + (available == null ? "—" : money(available)) + '</b></span><span>Credit limit <b>' + (limit == null ? "—" : money(limit)) + '</b></span></div></div>';
+        }).join("")
+      : '<span class="muted">No Concora accounts connected yet.</span>';
+
   const creditOneAccountsBox = $("creditOneAccounts");
   if (creditOneAccountsBox) {
     creditOneAccountsBox.innerHTML = creditOneAccounts.length
@@ -518,6 +531,10 @@ document.addEventListener("click", async e => {
         console.error("Credit One connection check failed", err);
         toast(err?.message || "Unable to connect Credit One.");
       }
+      return;
+    }
+    if (action === "sync-concora") {
+      await syncPlaidAccounts();
       return;
     }
     if (action === "sync-capital-one") {
