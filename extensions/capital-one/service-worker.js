@@ -1,13 +1,48 @@
-(typeof browser !== "undefined" ? browser : chrome).runtime.onMessage.addListener(async (msg) => {
-  if (msg?.type === "CAPITAL_ONE_BALANCE") {
-    const tabs = await (typeof browser !== "undefined" ? browser : chrome).tabs.query({url:["https://jtczy6pfmy.github.io/Money-Hub/*"]});
-    for (const tab of tabs) if (tab.id) (typeof browser !== "undefined" ? browser : chrome).tabs.sendMessage(tab.id,msg).catch(()=>{});
+const api = typeof browser !== "undefined" ? browser : chrome;
+
+api.runtime.onMessage.addListener((msg) => {
+  if (!msg) return;
+
+  if (msg.type === "CAPITAL_ONE_BALANCE") {
+    forwardBalance(msg);
+    return;
   }
 
-  if (msg?.type === "REQUEST_CAPITAL_ONE_SYNC") {
-    const tabs = await (typeof browser !== "undefined" ? browser : chrome).tabs.query({url:["https://*.capitalone.com/*"]});
-    for (const tab of tabs) if (tab.id) {
-      (typeof browser !== "undefined" ? browser : chrome).tabs.sendMessage(tab.id,{type:"REQUEST_CAPITAL_ONE_SYNC"}).catch(()=>{});
-    }
+  if (msg.type === "REQUEST_CAPITAL_ONE_SYNC") {
+    requestCapitalOneSync();
   }
 });
+
+async function forwardBalance(msg) {
+  try {
+    const tabs = await api.tabs.query({});
+    for (const tab of tabs) {
+      if (!tab.id || !tab.url) continue;
+      try {
+        const url = new URL(tab.url);
+        if (url.hostname === "jtczy6pfmy.github.io" && url.pathname.startsWith("/Money-Hub/")) {
+          await api.tabs.sendMessage(tab.id, msg);
+        }
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.error("Money Hub balance forwarding failed", err);
+  }
+}
+
+async function requestCapitalOneSync() {
+  try {
+    const tabs = await api.tabs.query({});
+    for (const tab of tabs) {
+      if (!tab.id || !tab.url) continue;
+      try {
+        const url = new URL(tab.url);
+        if (url.hostname.endsWith("capitalone.com")) {
+          await api.tabs.sendMessage(tab.id, { type: "REQUEST_CAPITAL_ONE_SYNC" });
+        }
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.error("Capital One sync request failed", err);
+  }
+}
