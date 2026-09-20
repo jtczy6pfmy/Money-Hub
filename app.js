@@ -252,7 +252,7 @@ function accounts() {
       button.classList.remove("primary");
       button.classList.add("ghost");
     } else {
-      button.textContent = "Connect Capital One";
+      button.textContent = "Add Capital One";
       button.disabled = false;
       button.classList.add("primary");
       button.classList.remove("ghost");
