@@ -384,7 +384,14 @@ $("toggleAuth").onclick = () => {
 $("signOut").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 $("modalClose").onclick = $("modalCancel").onclick = () => $("modal").classList.add("hidden");
 $("modalForm").onsubmit = saveModal;
-$("refresh").onclick = async () => {\n  try {\n    await load();\n    toast("Money Hub refreshed");\n  } catch (err) {\n    toast(err?.message || "Unable to refresh Money Hub");\n  }\n};
+$("refresh").onclick = async () => {
+  try {
+    await load();
+    toast("Money Hub refreshed");
+  } catch (err) {
+    toast(err?.message || "Unable to refresh Money Hub");
+  }
+};
 $("refreshAccounts").onclick = async () => {
   await loadAccountsData();
   accounts();
