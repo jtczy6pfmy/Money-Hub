@@ -228,7 +228,6 @@ const forms = {
 };
 
 function openModal(type) {
-  if (type === "connect-account" || type === "connect-capital-one") { connectPlaidAccount(); return; }
   if (type === "login" && !state.vaultUnlocked) { unlockVault().then(ok => { if (ok) openModal("login"); }); return; }
   let f = forms[type];
   $("modalTitle").textContent = "Add";
