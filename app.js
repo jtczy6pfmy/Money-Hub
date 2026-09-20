@@ -297,9 +297,13 @@ window.addEventListener("message", async (event) => {
 
 function accounts() {
   const capital = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
+  const creditOne = state.accounts.find(x => /credit one/i.test(String(x.institution_name || "")));
   const balance = capital ? (capital.current_balance ?? capital.available_balance ?? 0) : 0;
   const balanceBox = $("capitalOneBalance");
   if (balanceBox) balanceBox.textContent = money(balance);
+  const creditOneBalanceBox = $("creditOneBalance");
+  const creditOneBalance = creditOne ? (creditOne.current_balance ?? creditOne.available_balance ?? 0) : 0;
+  if (creditOneBalanceBox) creditOneBalanceBox.textContent = money(creditOneBalance);
 
   const card = document.querySelector("#accounts .account-category-grid article:first-child");
   const button = card?.querySelector("[data-action]");
@@ -308,6 +312,14 @@ function accounts() {
     button.disabled = false;
     button.classList.add("primary");
     button.classList.remove("ghost");
+  }
+  const creditOneCard = document.querySelector("#accounts .account-category-grid article:nth-child(2)");
+  const creditOneButton = creditOneCard?.querySelector("[data-action]");
+  if (creditOneButton) {
+    creditOneButton.textContent = "↻ Sync Credit One";
+    creditOneButton.disabled = false;
+    creditOneButton.classList.add("primary");
+    creditOneButton.classList.remove("ghost");
   }
 }
 
@@ -471,6 +483,18 @@ document.addEventListener("click", async e => {
   if (a) {
     e.preventDefault();
     const action = a.dataset.action;
+    if (action === "sync-credit-one") {
+      try {
+        const status = await plaidCall("status");
+        const linked = (status.items || []).some(x => /credit one/i.test(String(x.institution_name || "")));
+        if (!linked) await connectPlaidAccount();
+        else await syncPlaidAccounts();
+      } catch (err) {
+        console.error("Credit One connection check failed", err);
+        toast(err?.message || "Unable to connect Credit One.");
+      }
+      return;
+    }
     if (action === "sync-capital-one") {
       try {
         const status = await plaidCall("status");
