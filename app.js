@@ -223,7 +223,7 @@ async function logins() {
     }
     state.logins.push(x);
   }
-  box.innerHTML = state.logins.map(x => '<article class="account-card"><span class="badge">' + esc(x.account_type || "Other") + '</span><h3>' + esc(x.account_name) + '</h3><span class="muted">' + esc(x.website_url || "") + '</span><div class="vault-row"><span>Username</span><b>' + esc(x.username || "—") + '</b></div><div class="vault-row"><span>Password</span><b>••••••••</b></div><div class="vault-actions"><button class="ghost" data-copy="' + esc(x.username || "") + '">Copy username</button><button class="ghost" data-copy="' + esc(x.password || "") + '">Copy password</button><button class="text-button" data-reveal="' + x.id + '">Reveal password</button></div></article>').join("") || '<div class="panel"><span class="muted">No account logins yet. Add your first one.</span></div>';
+  box.innerHTML = state.logins.map(x => '<article class="account-card"><span class="badge">' + esc(x.account_type || "Other") + '</span><h3>' + esc(x.account_name) + '</h3><span class="muted">' + esc(x.website_url || "") + '</span><div class="vault-row"><span>Username</span><b>' + esc(x.username || "—") + '</b></div><div class="vault-row"><span>Password</span><b>••••••••</b></div><div class="vault-actions"><button class="ghost" data-copy="' + esc(x.username || "") + '">Copy username</button><button class="ghost" data-copy="' + esc(x.password || "") + '">Copy password</button><button class="text-button" data-reveal="' + x.id + '">Reveal password</button><button class="text-button" data-edit-password="' + x.id + '">Edit password</button></div></article>').join("") || '<div class="panel"><span class="muted">No account logins yet. Add your first one.</span></div>';
 }
 
 function spending() { $("spendingList").innerHTML = table(["Date", "Description", "Category", "Account", "Amount"], state.transactions.map(x => '<tr><td>' + esc(x.transaction_date) + '</td><td>' + esc(x.description) + '</td><td>' + esc(x.category) + '</td><td>' + esc(x.account_name) + '</td><td>' + money(x.amount) + '</td></tr>')); }
@@ -604,6 +604,28 @@ document.addEventListener("click", async e => {
   if (rv) {
     const x = state.logins.find(v => String(v.id) === rv.dataset.reveal);
     if (x) rv.previousElementSibling.textContent = x.password || "—";
+  }
+  let ep = e.target.closest("[data-edit-password]");
+  if (ep) {
+    const x = state.logins.find(v => String(v.id) === ep.dataset.editPassword);
+    if (!x) return;
+    const next = window.prompt("Enter the new password for " + (x.account_name || "this account") + ":");
+    if (next === null) return;
+    if (!next) { toast("Password cannot be blank."); return; }
+    try {
+      const ciphertext = await encryptVault(next, state.vaultKey);
+      const { error } = await sb.from("finance_account_logins").update({
+        password_ciphertext: ciphertext,
+        password: null,
+        last_updated_at: new Date().toISOString()
+      }).eq("id", x.id).eq("household_id", state.household.id);
+      if (error) throw error;
+      x.password = next;
+      x.password_ciphertext = ciphertext;
+      toast("Password updated");
+    } catch (err) {
+      toast(err?.message || "Unable to update password.");
+    }
   }
 });
 
