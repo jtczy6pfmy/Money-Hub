@@ -373,6 +373,20 @@ function accounts() {
     button.classList.add("primary");
     button.classList.remove("ghost");
   }
+  const concoraAccounts = state.accounts.filter(x => /concora/i.test(String(x.institution_name || "")));
+  const concoraAccountsBox = $("concoraAccounts");
+  if (concoraAccountsBox) {
+    concoraAccountsBox.innerHTML = concoraAccounts.length
+      ? concoraAccounts.map((account, index) => {
+          const current = account.current_balance ?? 0;
+          const available = account.available_balance;
+          const limit = account.credit_limit;
+          const label = concoraAccounts.length > 1 ? "Concora Account " + (index + 1) : "Concora";
+          return '<div class="credit-one-account"><div class="credit-one-account-head"><strong>' + esc(label) + '</strong><span class="badge">' + esc(account.account_name || "Credit Card") + '</span></div><div class="big">' + money(current) + '</div><span class="muted">Current balance</span><div class="credit-one-details"><span>Available credit <b>' + (available == null ? "—" : money(available)) + '</b></span><span>Credit limit <b>' + (limit == null ? "—" : money(limit)) + '</b></span></div></div>';
+        }).join("")
+      : '<span class="muted">No Concora accounts connected yet.</span>';
+  }
+
   const creditOneCard = document.querySelector("#accounts .account-category-grid article:nth-child(2)");
   const creditOneButton = creditOneCard?.querySelector("[data-action]");
   if (creditOneButton) {
@@ -582,18 +596,19 @@ document.addEventListener("click", async e => {
       }
       return;
     }
-    if (action === "add-concora-login") {
-      if (!state.vaultUnlocked) {
-        const unlocked = await unlockVault();
-        if (!unlocked) return;
+    if (action === "sync-concora") {
+      try {
+        const status = await plaidCall("status");
+        const linked = (status.items || []).some(x => /concora/i.test(String(x.institution_name || "")));
+        if (!linked) {
+          await connectPlaidAccount({ institutionName: "Concora" });
+        } else {
+          await syncPlaidAccounts();
+        }
+      } catch (err) {
+        console.error("Concora connection check failed", err);
+        toast(err?.message || "Unable to connect Concora.");
       }
-      openModal("login");
-      setTimeout(() => {
-        const name = document.querySelector('[name="account_name"]');
-        const type = document.querySelector('[name="account_type"]');
-        if (name) name.value = "Concora";
-        if (type) type.value = "Credit Card";
-      }, 0);
       return;
     }
     if (action === "sync-capital-one") {
