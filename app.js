@@ -582,6 +582,20 @@ document.addEventListener("click", async e => {
       }
       return;
     }
+    if (action === "add-concora-login") {
+      if (!state.vaultUnlocked) {
+        const unlocked = await unlockVault();
+        if (!unlocked) return;
+      }
+      openModal("login");
+      setTimeout(() => {
+        const name = document.querySelector('[name="account_name"]');
+        const type = document.querySelector('[name="account_type"]');
+        if (name) name.value = "Concora";
+        if (type) type.value = "Credit Card";
+      }, 0);
+      return;
+    }
     if (action === "sync-capital-one") {
       try {
         const status = await plaidCall("status");
