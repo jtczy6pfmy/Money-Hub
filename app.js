@@ -49,6 +49,33 @@ async function decryptVault(payload, key) {
   return new TextDecoder().decode(data);
 }
 
+async function migrateLoginSecrets() {
+  if (!state.vaultKey) return;
+  const { data: rows, error } = await sb.from("finance_account_logins").select("*").eq("household_id", state.household.id);
+  if (error) throw error;
+  for (const row of rows || []) {
+    const updates = {};
+    const fields = [
+      ["username", "username_ciphertext"],
+      ["password", "password_ciphertext"],
+      ["account_number", "account_number_ciphertext"],
+      ["pin", "pin_ciphertext"],
+      ["security_notes", "security_notes_ciphertext"]
+    ];
+    for (const [plain, cipher] of fields) {
+      if (row[plain] != null && row[cipher] == null) {
+        updates[cipher] = await encryptVault(String(row[plain]), state.vaultKey);
+        updates[plain] = null;
+      }
+    }
+    if (Object.keys(updates).length) {
+      updates.last_updated_at = new Date().toISOString();
+      const { error: updateError } = await sb.from("finance_account_logins").update(updates).eq("id", row.id).eq("household_id", state.household.id);
+      if (updateError) throw updateError;
+    }
+  }
+}
+
 async function unlockVault() {
   if (state.vaultUnlocked) return true;
   const { data: settings, error } = await sb.from("finance_vault_settings").select("*").eq("household_id", state.household.id).maybeSingle();
@@ -73,6 +100,7 @@ async function unlockVault() {
     }
     state.vaultUnlocked = true;
     $("vaultStatus").textContent = "Unlocked for this session. Sensitive fields are decrypted only in your browser.";
+    await migrateLoginSecrets();
     await logins();
     accounts();
     return true;
@@ -177,9 +205,24 @@ function savings() { $("savingsList").innerHTML = state.savings.map(x => { let p
 
 async function logins() {
   const box = $("loginList");
+  if (!state.vaultUnlocked || !state.vaultKey) {
+    state.logins = [];
+    box.innerHTML = '<div class="panel"><span class="muted">Vault locked. Open Logins or choose Add login to unlock your saved credentials.</span></div>';
+    return;
+  }
   const { data, error } = await sb.from("finance_account_logins").select("*").eq("household_id", state.household.id).order("account_name");
   if (error) { box.innerHTML = '<div class="panel"><span class="muted">' + esc(error.message) + '</span></div>'; return; }
-  state.logins = data || [];
+  state.logins = [];
+  for (const row of data || []) {
+    const x = { ...row };
+    for (const [plain, cipher] of [["username","username_ciphertext"],["password","password_ciphertext"],["account_number","account_number_ciphertext"],["pin","pin_ciphertext"],["security_notes","security_notes_ciphertext"]]) {
+      if (x[cipher]) {
+        try { x[plain] = await decryptVault(x[cipher], state.vaultKey); }
+        catch (_) { x[plain] = null; }
+      }
+    }
+    state.logins.push(x);
+  }
   box.innerHTML = state.logins.map(x => '<article class="account-card"><span class="badge">' + esc(x.account_type || "Other") + '</span><h3>' + esc(x.account_name) + '</h3><span class="muted">' + esc(x.website_url || "") + '</span><div class="vault-row"><span>Username</span><b>' + esc(x.username || "—") + '</b></div><div class="vault-row"><span>Password</span><b>••••••••</b></div><div class="vault-actions"><button class="ghost" data-copy="' + esc(x.username || "") + '">Copy username</button><button class="ghost" data-copy="' + esc(x.password || "") + '">Copy password</button><button class="text-button" data-reveal="' + x.id + '">Reveal password</button></div></article>').join("") || '<div class="panel"><span class="muted">No account logins yet. Add your first one.</span></div>';
 }
 
@@ -378,12 +421,27 @@ async function saveModal(e) {
     return;
   }
   if (type === "login") {
-    data = { household_id: state.household.id, user_id: state.user.id, account_name: data.account_name, account_type: data.account_type || "Other", website_url: data.website_url, username: data.username || null, password: data.password || null, account_number: data.account_number || null, pin: data.pin || null, security_notes: data.security_notes || null, phone_number: data.phone_number, notes: data.notes, last_updated_at: new Date().toISOString() };
+    if (!state.vaultUnlocked || !state.vaultKey) { toast("Unlock the vault before saving a login."); return; }
+    data = {
+      household_id: state.household.id,
+      user_id: state.user.id,
+      account_name: data.account_name,
+      account_type: data.account_type || "Other",
+      website_url: data.website_url,
+      username_ciphertext: data.username ? await encryptVault(data.username, state.vaultKey) : null,
+      password_ciphertext: data.password ? await encryptVault(data.password, state.vaultKey) : null,
+      account_number_ciphertext: data.account_number ? await encryptVault(data.account_number, state.vaultKey) : null,
+      pin_ciphertext: data.pin ? await encryptVault(data.pin, state.vaultKey) : null,
+      security_notes_ciphertext: data.security_notes ? await encryptVault(data.security_notes, state.vaultKey) : null,
+      phone_number: data.phone_number,
+      notes: data.notes,
+      last_updated_at: new Date().toISOString()
+    };
     const { error } = await sb.from("finance_account_logins").insert(data);
     if (error) { toast(error.message); return; }
     $("modal").classList.add("hidden");
     await logins();
-    toast("Login saved");
+    toast("Login saved securely");
     return;
   }
   if (!f.table) { $("modal").classList.add("hidden"); toast("Not connected yet."); return; }
@@ -502,6 +560,10 @@ document.addEventListener("click", async e => {
     const action = a.dataset.action;
     if (action === "sync-credit-one") {
       try {
+        if (!state.vaultUnlocked) {
+          const unlocked = await unlockVault();
+          if (!unlocked) return;
+        }
         const login = state.logins.find(x => /credit\s*one/i.test(String(x.account_name || "")));
         if (!login) throw new Error("Save your Credit One login in the Vault first.");
         const status = await plaidCall("status");
@@ -547,6 +609,10 @@ document.addEventListener("click", async e => {
 
 async function show(id) {
   if (id === "accounts") { await loadAccountsData(); accounts(); }
+  if (id === "logins" && !state.vaultUnlocked) {
+    const unlocked = await unlockVault();
+    if (!unlocked) return;
+  }
   if (id === "logins") await logins();
   document.querySelectorAll(".section").forEach(x => x.classList.remove("active"));
   $(id).classList.add("active");
