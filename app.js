@@ -598,15 +598,10 @@ document.addEventListener("click", async e => {
     }
     if (action === "sync-concora") {
       try {
-        const status = await plaidCall("status");
-        const linked = (status.items || []).some(x => /concora/i.test(String(x.institution_name || "")));
-        if (!linked) {
-          await connectPlaidAccount({ institutionName: "Concora" });
-        } else {
-          await syncPlaidAccounts();
-        }
+        toast("Opening Concora connection…");
+        await connectPlaidAccount({ institutionName: "Concora" });
       } catch (err) {
-        console.error("Concora connection check failed", err);
+        console.error("Concora connection failed", err);
         toast(err?.message || "Unable to connect Concora.");
       }
       return;
