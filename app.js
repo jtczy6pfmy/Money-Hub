@@ -437,7 +437,7 @@ function accounts() {
   const card = document.querySelector("#accounts .account-category-grid article:first-child");
   const button = card?.querySelector("[data-action]");
   if (button) {
-    button.textContent = "↻ Sync Capital One";
+    button.textContent = "↻ Refresh Capital One via Plaid";
     button.disabled = false;
     button.classList.add("primary");
     button.classList.remove("ghost");
@@ -459,7 +459,7 @@ function accounts() {
   const creditOneCard = document.querySelector("#accounts .account-category-grid article:nth-child(2)");
   const creditOneButton = creditOneCard?.querySelector("[data-action]");
   if (creditOneButton) {
-    creditOneButton.textContent = "↗ Connect Credit One";
+    creditOneButton.textContent = "↻ Refresh Credit One via Plaid";
     creditOneButton.disabled = false;
     creditOneButton.classList.add("primary");
     creditOneButton.classList.remove("ghost");
