@@ -676,21 +676,17 @@ document.addEventListener("click", async e => {
     }
     if (action === "sync-capital-one") {
       try {
-        toast("Requesting Capital One balance…");
-        window.postMessage({
-          type: "MONEY_HUB_REQUEST_CAPITAL_ONE_SYNC",
-          source: "money-hub"
-        }, window.location.origin);
-        setTimeout(() => {
-          const capital = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
-          const updatedAt = capital?.balance_updated_at ? new Date(capital.balance_updated_at).getTime() : 0;
-          if (!updatedAt || Date.now() - updatedAt > 5000) {
-            toast("Capital One did not return a balance. Make sure the Capital One extension is installed and Capital One is open.");
-          }
-        }, 4500);
+        toast("Checking Capital One connection through Plaid…");
+        const status = await plaidCall("status");
+        const linked = (status.items || []).some(x => /capital one/i.test(String(x.institution_name || "")));
+        if (!linked) {
+          await connectPlaidAccount({ institutionName: "Capital One" });
+        } else {
+          await syncPlaidAccounts();
+        }
       } catch (err) {
-        console.error("Capital One sync request failed", err);
-        toast(err?.message || "Unable to request Capital One balance.");
+        console.error("Capital One Plaid connection check failed", err);
+        toast(err?.message || "Unable to connect Capital One through Plaid.");
       }
       return;
     }
