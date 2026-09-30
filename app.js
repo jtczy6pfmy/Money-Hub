@@ -642,25 +642,11 @@ document.addEventListener("click", async e => {
     }
     if (action === "sync-credit-one") {
       try {
-        if (!state.vaultUnlocked) {
-          const unlocked = await unlockVault();
-          if (!unlocked) return;
-        }
-        const login = state.logins.find(x => /credit\s*one/i.test(String(x.account_name || "")));
-        if (!login) throw new Error("Save your Credit One login in the Vault first.");
-        const status = await plaidCall("status");
-        const linked = (status.items || []).some(x => /credit one/i.test(String(x.institution_name || "")));
-        if (!linked) {
-          await connectPlaidAccount({
-            institutionName: "Credit One",
-            accountLoginId: login.id
-          });
-        } else {
-          await syncPlaidAccounts();
-        }
+        toast("Opening Credit One through Plaid…");
+        await connectPlaidAccount({ institutionName: "Credit One" });
       } catch (err) {
-        console.error("Credit One connection check failed", err);
-        toast(err?.message || "Unable to connect Credit One.");
+        console.error("Credit One Plaid connection failed", err);
+        toast(err?.message || "Unable to open Credit One through Plaid.");
       }
       return;
     }
@@ -676,17 +662,11 @@ document.addEventListener("click", async e => {
     }
     if (action === "sync-capital-one") {
       try {
-        toast("Checking Capital One connection through Plaid…");
-        const status = await plaidCall("status");
-        const linked = (status.items || []).some(x => /capital one/i.test(String(x.institution_name || "")));
-        if (!linked) {
-          await connectPlaidAccount({ institutionName: "Capital One" });
-        } else {
-          await syncPlaidAccounts();
-        }
+        toast("Opening Capital One through Plaid…");
+        await connectPlaidAccount({ institutionName: "Capital One" });
       } catch (err) {
-        console.error("Capital One Plaid connection check failed", err);
-        toast(err?.message || "Unable to connect Capital One through Plaid.");
+        console.error("Capital One Plaid connection failed", err);
+        toast(err?.message || "Unable to open Capital One through Plaid.");
       }
       return;
     }
