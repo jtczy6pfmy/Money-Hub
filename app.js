@@ -93,9 +93,19 @@ async function unlockVault() {
       if (ins.error) throw ins.error;
       s = ins.data;
       state.vaultKey = key;
+    } else if (!s.verifier_ciphertext) {
+      const salt = s.salt || await b64(crypto.getRandomValues(new Uint8Array(16)));
+      const key = await deriveVaultKey(pass, salt);
+      const verifier = await encryptVault("MONEY_HUB_VAULT_OK", key);
+      const { error: resetError } = await sb.from("finance_vault_settings")
+        .update({ salt, verifier_ciphertext: verifier })
+        .eq("id", s.id)
+        .eq("household_id", state.household.id);
+      if (resetError) throw resetError;
+      state.vaultKey = key;
     } else {
       const key = await deriveVaultKey(pass, s.salt);
-      if (!s.verifier_ciphertext || await decryptVault(s.verifier_ciphertext, key) !== "MONEY_HUB_VAULT_OK") throw new Error("Incorrect vault password.");
+      if (await decryptVault(s.verifier_ciphertext, key) !== "MONEY_HUB_VAULT_OK") throw new Error("Incorrect vault password.");
       state.vaultKey = key;
     }
     state.vaultUnlocked = true;
@@ -113,7 +123,61 @@ async function unlockVault() {
 }
 
 async function resetVault() {
-  toast("Vault passwords are disabled. Your Logins are available without a password.");
+  if (!state.household) return;
+  const confirmed = window.confirm(
+    "Reset the Money Hub vault?\n\nThis will erase the encrypted usernames, passwords, account numbers, PINs, and security notes currently stored in the Login Vault. Your bills, income, debt, savings, transactions, accounts, and other Money Hub data will NOT be changed.\n\nYou will create a new vault password afterward."
+  );
+  if (!confirmed) return;
+  const check = window.prompt('Type RESET to confirm the vault reset:');
+  if (check !== "RESET") {
+    toast("Vault reset cancelled.");
+    return;
+  }
+
+  try {
+    const { error: clearError } = await sb.from("finance_account_logins")
+      .update({
+        username_ciphertext: null,
+        password_ciphertext: null,
+        account_number_ciphertext: null,
+        pin_ciphertext: null,
+        security_notes_ciphertext: null,
+        username: null,
+        password: null,
+        account_number: null,
+        pin: null,
+        security_notes: null,
+        last_updated_at: new Date().toISOString()
+      })
+      .eq("household_id", state.household.id);
+
+    if (clearError) throw clearError;
+
+    const salt = await b64(crypto.getRandomValues(new Uint8Array(16)));
+    const { data: existingSettings, error: settingsError } = await sb.from("finance_vault_settings")
+      .select("id")
+      .eq("household_id", state.household.id)
+      .maybeSingle();
+    if (settingsError) throw settingsError;
+
+    if (existingSettings?.id) {
+      const { error } = await sb.from("finance_vault_settings")
+        .update({ salt, verifier_ciphertext: null })
+        .eq("id", existingSettings.id)
+        .eq("household_id", state.household.id);
+      if (error) throw error;
+    } else {
+      const { error } = await sb.from("finance_vault_settings")
+        .insert({ household_id: state.household.id, salt, verifier_ciphertext: null });
+      if (error) throw error;
+    }
+
+    await lockVault();
+    $("vaultStatus").textContent = "Vault reset. Choose a new password to create your new vault.";
+    toast("Vault reset. Your old encrypted login secrets were erased.");
+  } catch (err) {
+    toast(err?.message || "Unable to reset the vault.");
+  }
 }
 
 async function lockVault() {
@@ -572,6 +636,10 @@ document.addEventListener("click", async e => {
   if (a) {
     e.preventDefault();
     const action = a.dataset.action;
+    if (action === "reset-vault") {
+      await resetVault();
+      return;
+    }
     if (action === "sync-credit-one") {
       try {
         if (!state.vaultUnlocked) {
