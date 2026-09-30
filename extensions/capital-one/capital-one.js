@@ -1,82 +1,65 @@
 (() => {
   let last = null;
+  const api = typeof browser !== "undefined" ? browser : chrome;
 
-  function readDocument(doc) {
-    const previous = document;
-    try {
-      return (function() {
-        function readBalance() {
-    const parse = (raw) => {
-      const text = String(raw || "").replace(/\u00a0/g, " ").trim();
-      const match = text.match(/-?\$?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/);
-      if (!match) return null;
+  function parseMoney(raw) {
+    const text = String(raw || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    const matches = [...text.matchAll(/-?\$\s*([0-9][0-9,]*(?:\.\d{1,2})?)/g)];
+    for (const match of matches) {
       const value = Number(match[1].replace(/,/g, ""));
-      return Number.isFinite(value) ? value : null;
-    };
+      if (Number.isFinite(value)) return value;
+    }
+    return null;
+  }
 
-    // Capital One renders the account balance as a parent containing
-    // multiple dollar/superscript nodes. The first dollar node is empty;
-    // the second dollar node contains the actual whole-dollar amount.
-    const balances = Array.from(document.querySelectorAll(".primary-detail__balance"));
-    for (const balance of balances) {
-      const parts = Array.from(balance.querySelectorAll(".primary-detail__balance__dollar"))
-        .map(el => parse(el.textContent || el.innerText || ""))
-        .filter(v => v !== null);
+  function readBalance() {
+    const selectors = [
+      ".primary-detail__balance",
+      ".primary-detail__balance__dollar",
+      "[data-testid*='balance' i]",
+      "[class*='balance' i]"
+    ];
 
-      const nonZero = parts.filter(v => v !== 0);
-      if (nonZero.length) return nonZero[0];
-      if (parts.length) return parts[0];
+    const candidates = [];
+    for (const selector of selectors) {
+      for (const el of document.querySelectorAll(selector)) {
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        if (!rect.width || !rect.height || style.display === "none" || style.visibility === "hidden") continue;
+        const value = parseMoney(el.textContent || el.innerText || "");
+        if (value !== null) candidates.push({ value, area: rect.width * rect.height });
+      }
     }
 
-    // Fallback for minor Capital One markup changes.
-    const direct = Array.from(document.querySelectorAll(
-      ".primary-detail__balance__dollar"
-    ))
-      .map(el => parse(el.textContent || el.innerText || ""))
-      .filter(v => v !== null);
-
-    const nonZeroDirect = direct.filter(v => v !== 0);
-    return nonZeroDirect.length ? nonZeroDirect[0] : (direct[0] ?? null);
+    // Prefer a visible non-zero balance from the largest visible balance-like element.
+    const nonZero = candidates.filter(x => x.value !== 0).sort((a, b) => b.area - a.area);
+    if (nonZero.length) return nonZero[0].value;
+    return candidates.sort((a, b) => b.area - a.area)[0]?.value ?? null;
   }
 
   function sync(force = false) {
     const balance = readBalance();
     if (balance === null || (!force && balance === last)) return;
     last = balance;
-    return (typeof browser !== "undefined" ? browser : chrome).runtime.sendMessage({
-      type: "CAPITAL_ONE_BALANCE",
-      balance
-    });
+    api.runtime.sendMessage({ type: "CAPITAL_ONE_BALANCE", balance });
   }
 
-  (typeof browser !== "undefined" ? browser : chrome).runtime.onMessage.addListener((msg) => {
-    if (msg?.type === "REQUEST_CAPITAL_ONE_SYNC") {
-      const balance = readBalance();
-      if (Number.isFinite(balance)) {
-        last = balance;
-        (typeof browser !== "undefined" ? browser : chrome).runtime.sendMessage({
-          type: "CAPITAL_ONE_BALANCE",
-          balance
-        });
-        return Promise.resolve({ balance });
-      }
-      return Promise.resolve({ balance: null });
+  api.runtime.onMessage.addListener((msg) => {
+    if (msg?.type !== "REQUEST_CAPITAL_ONE_SYNC") return;
+    const balance = readBalance();
+    if (Number.isFinite(balance)) {
+      last = balance;
+      api.runtime.sendMessage({ type: "CAPITAL_ONE_BALANCE", balance });
+      return Promise.resolve({ balance });
     }
+    return Promise.resolve({ balance: null });
   });
 
-  sync();
-
-  const observe = (win) => {
-    try {
-      new MutationObserver(() => sync()).observe(win.document.documentElement, {
-        subtree: true,
-        childList: true,
-        characterData: true
-      });
-      for (let i = 0; i < win.frames.length; i++) observe(win.frames[i]);
-    } catch (_) {}
-  };
-
-  observe(window);
+  sync(true);
+  new MutationObserver(() => sync()).observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    characterData: true
+  });
   setInterval(() => sync(), 1500);
 })();
