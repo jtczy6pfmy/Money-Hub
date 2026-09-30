@@ -480,9 +480,8 @@ const forms = {
   account: { table: "finance_accounts", fields: [["institution_name", "Bank / institution", "text"], ["account_name", "Account name", "text"], ["account_type", "Account type", "select:Checking|Savings|Credit Card|Cash|Loan|Other"], ["current_balance", "Current balance", "number"], ["available_balance", "Available balance", "number"], ["credit_limit", "Credit limit", "number"], ["interest_rate", "APR %", "number"], ["minimum_payment", "Minimum payment", "number"], ["due_date", "Due date", "date"], ["notes", "Notes", "textarea"]] }
 };
 
-async function openConcoraLogin() {
-  const login = state.logins.find(x => /concora/i.test(String(x.account_name || "")));
-  const url = login?.website_url || "https://login.myfinanceservice.com/";
+function openConcoraLogin() {
+  const url = "https://login.myfinanceservice.com/";
   const popup = window.open(url, "concoraLogin", "width=520,height=760,resizable=yes,scrollbars=yes");
   if (!popup) {
     toast("Please allow pop-ups for Money Hub, then try Concora again.");
