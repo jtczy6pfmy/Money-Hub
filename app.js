@@ -758,3 +758,60 @@ sb.auth.getSession().then(async ({ data, error }) => {
     try { await load(); } catch (e) { $("authMessage").textContent = e.message; }
   }
 });
+
+
+window.addEventListener("message", async (event) => {
+  if (event.source !== window || event.origin !== window.location.origin) return;
+  const msg = event.data;
+  if (!msg || !["MONEY_HUB_CONCORA_ACCOUNTS", "CONCORA_ACCOUNTS"].includes(msg.type)) return;
+  const incoming = Array.isArray(msg.accounts) ? msg.accounts : [];
+  if (!incoming.length || !state.user || !state.household) return;
+
+  try {
+    const existing = state.accounts.filter(x => /concora/i.test(String(x.institution_name || "")));
+    const seen = new Set();
+
+    for (const card of incoming.slice(0, 10)) {
+      const name = String(card.card_name || card.account_name || "Concora").trim().slice(0, 120);
+      const balance = Number(card.current_balance ?? card.balance ?? card.amount);
+      if (!name || !Number.isFinite(balance)) continue;
+
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const match = existing.find(x => String(x.account_name || "").trim().toLowerCase() === key);
+      const values = {
+        institution_name: "Concora",
+        account_name: name,
+        account_type: "Credit Card",
+        current_balance: balance,
+        available_balance: match?.available_balance ?? null,
+        credit_limit: match?.credit_limit ?? null,
+        interest_rate: match?.interest_rate ?? null,
+        minimum_payment: match?.minimum_payment ?? 0,
+        due_date: match?.due_date ?? null,
+        notes: match?.notes ?? null,
+        household_id: state.household.id,
+        user_id: state.user.id,
+        is_active: true,
+        connection_provider: "concora-browser-extension",
+        last_updated_at: new Date().toISOString(),
+        balance_updated_at: new Date().toISOString()
+      };
+
+      const result = match?.id
+        ? await sb.from("finance_accounts").update(values).eq("id", match.id)
+        : await sb.from("finance_accounts").insert(values);
+
+      if (result.error) throw result.error;
+    }
+
+    await loadAccountsData();
+    accounts();
+    if ($("accounts")?.classList.contains("active")) toast("Concora cards synced");
+  } catch (err) {
+    console.error("Concora sync failed", err);
+    toast(err?.message || "Unable to sync Concora cards");
+  }
+});
