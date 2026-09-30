@@ -110,47 +110,15 @@ function readVisibleBalance(tabId) {
 }
 
 async function requestCapitalOneSync() {
-  try {
-    const tabs = await api.tabs.query({});
-
-    for (const tab of tabs) {
-      if (!tab.id || !tab.url) continue;
-
-      try {
-        const url = new URL(tab.url);
-        if (!url.hostname.endsWith("capitalone.com")) continue;
-
-        let response = null;
-        try {
-          response = await api.tabs.sendMessage(tab.id, { type: "REQUEST_CAPITAL_ONE_SYNC" });
-        } catch (_) {}
-
-        // The Capital One content script is the authoritative reader.
-        // Do not run a second DOM read here, because Capital One can expose
-        // a hidden/placeholder $0 element to executeScript while the content
-        // script sees the actual visible balance.
-        const balance = Number(response?.balance);
-
-        if (Number.isFinite(balance)) {
-          return;
-        }
-
-        // Only use the direct DOM fallback if the content script did not
-        // respond with a usable balance.
-        const result = await readVisibleBalance(tab.id);
-        const fallbackBalance = result?.[0]?.result ?? result?.[0];
-
-        if (Number.isFinite(fallbackBalance)) {
-          await forwardBalance({
-            type: "CAPITAL_ONE_BALANCE",
-            balance: fallbackBalance
-          });
-        }
-      } catch (err) {
-        console.error("Capital One tab sync failed", err);
-      }
-    }
-  } catch (err) {
-    console.error("Capital One sync request failed", err);
+  const tabs = await api.tabs.query({});
+  for (const tab of tabs) {
+    if (!tab.id || !tab.url) continue;
+    try {
+      const url = new URL(tab.url);
+      if (!url.hostname.endsWith("capitalone.com")) continue;
+      const response = await api.tabs.sendMessage(tab.id, { type: "REQUEST_CAPITAL_ONE_SYNC" }).catch(() => null);
+      const balance = Number(response?.balance);
+      if (Number.isFinite(balance)) return;
+    } catch (_) {}
   }
 }
