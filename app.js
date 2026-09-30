@@ -481,47 +481,15 @@ const forms = {
 };
 
 async function openConcoraLogin() {
-  if (!state.vaultUnlocked) {
-    const unlocked = await unlockVault();
-    if (!unlocked) return;
-  }
   const login = state.logins.find(x => /concora/i.test(String(x.account_name || "")));
-  $("modalTitle").textContent = "Concora Login";
-  $("modalFields").innerHTML =
-    '<div class="field-grid">' +
-      '<label>Username<input id="concoraUsername" type="text" autocomplete="username" value="' + esc(login?.username || "") + '"></label>' +
-      '<label>Password<input id="concoraPassword" type="password" autocomplete="current-password" value="' + esc(login?.password || "") + '"></label>' +
-    '</div>' +
-    '<p class="muted">Concora does not use Plaid. This opens the secure Concora sign-in page in a separate window. Your credentials remain in the Money Hub Login Vault.</p>' +
-    '<div class="modal-actions" style="justify-content:flex-start;margin-top:10px">' +
-      '<button type="button" class="ghost" id="concoraOpenLogin">Open Concora Login</button>' +
-    '</div>';
-  $("modal").classList.remove("hidden");
-  $("modal").dataset.type = "concora-login";
-  $("concoraOpenLogin").onclick = async () => {
-    const username = $("concoraUsername").value.trim();
-    const password = $("concoraPassword").value;
-    if (!username || !password) { toast("Enter your Concora username and password."); return; }
-    try {
-      const ciphertextUser = await encryptVault(username, state.vaultKey);
-      const ciphertextPass = await encryptVault(password, state.vaultKey);
-      if (login?.id) {
-        const { error } = await sb.from("finance_account_logins").update({
-          username_ciphertext: ciphertextUser,
-          password_ciphertext: ciphertextPass,
-          last_updated_at: new Date().toISOString()
-        }).eq("id", login.id).eq("household_id", state.household.id);
-        if (error) throw error;
-      }
-      window.open(login?.website_url || "https://login.myfinanceservice.com/", "_blank", "noopener,noreferrer");
-      $("modal").classList.add("hidden");
-      await logins();
-      toast("Concora login opened");
-    } catch (err) {
-      console.error("Concora login setup failed", err);
-      toast(err?.message || "Unable to open Concora login.");
-    }
-  };
+  const url = login?.website_url || "https://login.myfinanceservice.com/";
+  const popup = window.open(url, "concoraLogin", "width=520,height=760,resizable=yes,scrollbars=yes");
+  if (!popup) {
+    toast("Please allow pop-ups for Money Hub, then try Concora again.");
+    return;
+  }
+  try { popup.focus(); } catch (_) {}
+  toast("Concora login opened");
 }
 
 function openModal(type) {
