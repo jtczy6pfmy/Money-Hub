@@ -1,0 +1,41 @@
+{
+  "manifest_version": 2,
+  "name": "Money Hub - Concora Sync",
+  "version": "1.0.0",
+  "description": "Reads visible Concora card names and current balances and sends them to Money Hub.",
+  "permissions": [
+    "tabs",
+    "https://*.myfinanceservice.com/*",
+    "https://jtczy6pfmy.github.io/Money-Hub/*"
+  ],
+  "background": {
+    "scripts": [
+      "service-worker.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.myfinanceservice.com/*"
+      ],
+      "js": [
+        "concora.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://jtczy6pfmy.github.io/Money-Hub/*"
+      ],
+      "js": [
+        "money-hub-bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "money-hub-concora-sync@jtczy6pfmy.github.io"
+    }
+  }
+}
