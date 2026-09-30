@@ -320,24 +320,29 @@ async function connectPlaidAccount(options = {}) {
   try {
     if (!window.Plaid) throw new Error("Plaid is still loading. Please try again.");
     toast("Opening secure bank connection…");
-    const data = await plaidCall("create_link_token", {
-      institution_id: options.institutionId || undefined
-    });
+    const action = options.updateItemId ? "create_update_link_token" : "create_link_token";
+    const data = await plaidCall(action, options.updateItemId
+      ? { item_id: options.updateItemId }
+      : { institution_id: options.institutionId || undefined });
     const handler = window.Plaid.create({
       token: data.link_token,
       onSuccess: async (public_token) => {
         try {
-          toast("Finishing account connection…");
-          await plaidCall("exchange_public_token", {
-            public_token,
-            account_login_id: options.accountLoginId || null
-          });
-          await loadAccountsData();
-          accounts();
-          toast((options.institutionName || "Account") + " connected");
+          if (options.updateItemId) {
+            toast("Refreshing account through Plaid…");
+            await syncPlaidAccounts();
+          } else {
+            toast("Finishing account connection…");
+            await plaidCall("exchange_public_token", {
+              public_token,
+              account_login_id: options.accountLoginId || null
+            });
+            await syncPlaidAccounts();
+          }
+          toast((options.institutionName || "Account") + " updated");
         } catch (err) {
           console.error("Plaid connection failed", err);
-          toast(err?.message || "Unable to finish the account connection.");
+          toast(err?.message || "Unable to finish the Plaid update.");
         }
       },
       onExit: (err) => {
@@ -642,10 +647,14 @@ document.addEventListener("click", async e => {
     }
     if (action === "sync-credit-one") {
       try {
-        toast("Opening Credit One through Plaid…");
-        await connectPlaidAccount({ institutionName: "Credit One" });
+        const status = await plaidCall("status");
+        const item = (status.items || []).find(x => /credit\s*one/i.test(String(x.institution_name || "")));
+        await connectPlaidAccount({
+          institutionName: "Credit One",
+          updateItemId: item?.item_id || null
+        });
       } catch (err) {
-        console.error("Credit One Plaid connection failed", err);
+        console.error("Credit One Plaid update failed", err);
         toast(err?.message || "Unable to open Credit One through Plaid.");
       }
       return;
@@ -662,10 +671,14 @@ document.addEventListener("click", async e => {
     }
     if (action === "sync-capital-one") {
       try {
-        toast("Opening Capital One through Plaid…");
-        await connectPlaidAccount({ institutionName: "Capital One" });
+        const status = await plaidCall("status");
+        const item = (status.items || []).find(x => /capital one/i.test(String(x.institution_name || "")));
+        await connectPlaidAccount({
+          institutionName: "Capital One",
+          updateItemId: item?.item_id || null
+        });
       } catch (err) {
-        console.error("Capital One Plaid connection failed", err);
+        console.error("Capital One Plaid update failed", err);
         toast(err?.message || "Unable to open Capital One through Plaid.");
       }
       return;
