@@ -480,6 +480,50 @@ const forms = {
   account: { table: "finance_accounts", fields: [["institution_name", "Bank / institution", "text"], ["account_name", "Account name", "text"], ["account_type", "Account type", "select:Checking|Savings|Credit Card|Cash|Loan|Other"], ["current_balance", "Current balance", "number"], ["available_balance", "Available balance", "number"], ["credit_limit", "Credit limit", "number"], ["interest_rate", "APR %", "number"], ["minimum_payment", "Minimum payment", "number"], ["due_date", "Due date", "date"], ["notes", "Notes", "textarea"]] }
 };
 
+async function openConcoraLogin() {
+  if (!state.vaultUnlocked) {
+    const unlocked = await unlockVault();
+    if (!unlocked) return;
+  }
+  const login = state.logins.find(x => /concora/i.test(String(x.account_name || "")));
+  $("modalTitle").textContent = "Concora Login";
+  $("modalFields").innerHTML =
+    '<div class="field-grid">' +
+      '<label>Username<input id="concoraUsername" type="text" autocomplete="username" value="' + esc(login?.username || "") + '"></label>' +
+      '<label>Password<input id="concoraPassword" type="password" autocomplete="current-password" value="' + esc(login?.password || "") + '"></label>' +
+    '</div>' +
+    '<p class="muted">Concora does not use Plaid. This opens the secure Concora sign-in page in a separate window. Your credentials remain in the Money Hub Login Vault.</p>' +
+    '<div class="modal-actions" style="justify-content:flex-start;margin-top:10px">' +
+      '<button type="button" class="ghost" id="concoraOpenLogin">Open Concora Login</button>' +
+    '</div>';
+  $("modal").classList.remove("hidden");
+  $("modal").dataset.type = "concora-login";
+  $("concoraOpenLogin").onclick = async () => {
+    const username = $("concoraUsername").value.trim();
+    const password = $("concoraPassword").value;
+    if (!username || !password) { toast("Enter your Concora username and password."); return; }
+    try {
+      const ciphertextUser = await encryptVault(username, state.vaultKey);
+      const ciphertextPass = await encryptVault(password, state.vaultKey);
+      if (login?.id) {
+        const { error } = await sb.from("finance_account_logins").update({
+          username_ciphertext: ciphertextUser,
+          password_ciphertext: ciphertextPass,
+          last_updated_at: new Date().toISOString()
+        }).eq("id", login.id).eq("household_id", state.household.id);
+        if (error) throw error;
+      }
+      window.open(login?.website_url || "https://login.myfinanceservice.com/", "_blank", "noopener,noreferrer");
+      $("modal").classList.add("hidden");
+      await logins();
+      toast("Concora login opened");
+    } catch (err) {
+      console.error("Concora login setup failed", err);
+      toast(err?.message || "Unable to open Concora login.");
+    }
+  };
+}
+
 function openModal(type) {
   if (type === "connect-account" || type === "connect-capital-one") { connectPlaidAccount(); return; }
   if (type === "login" && !state.vaultUnlocked) { unlockVault().then(ok => { if (ok) openModal("login"); }); return; }
@@ -660,13 +704,7 @@ document.addEventListener("click", async e => {
       return;
     }
     if (action === "sync-concora") {
-      try {
-        toast("Opening Concora connection…");
-        await connectPlaidAccount({ institutionName: "Concora" });
-      } catch (err) {
-        console.error("Concora connection failed", err);
-        toast(err?.message || "Unable to connect Concora.");
-      }
+      await openConcoraLogin();
       return;
     }
     if (action === "sync-capital-one") {
