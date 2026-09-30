@@ -373,8 +373,8 @@ async function loadAccountsData() {
 window.addEventListener("message", async (event) => {
   if (event.source !== window || event.origin !== window.location.origin) return;
   const msg = event.data;
-  if (!msg || msg.type !== "MONEY_HUB_CAPITAL_ONE_BALANCE") return;
-  const balance = Number(msg.balance);
+  if (!msg || !["MONEY_HUB_CAPITAL_ONE_BALANCE", "CAPITAL_ONE_BALANCE"].includes(msg.type)) return;
+  const balance = Number(msg.balance ?? msg.amount);
   if (!Number.isFinite(balance) || !state.user || !state.household) return;
   try {
     const existing = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
@@ -676,13 +676,21 @@ document.addEventListener("click", async e => {
     }
     if (action === "sync-capital-one") {
       try {
-        const status = await plaidCall("status");
-        const linked = (status.items || []).some(x => /capital one/i.test(String(x.institution_name || "")));
-        if (!linked) await connectPlaidAccount();
-        else await syncPlaidAccounts();
+        toast("Requesting Capital One balance…");
+        window.postMessage({
+          type: "MONEY_HUB_REQUEST_CAPITAL_ONE_SYNC",
+          source: "money-hub"
+        }, window.location.origin);
+        setTimeout(() => {
+          const capital = state.accounts.find(x => /capital one/i.test(String(x.institution_name || "")));
+          const updatedAt = capital?.balance_updated_at ? new Date(capital.balance_updated_at).getTime() : 0;
+          if (!updatedAt || Date.now() - updatedAt > 5000) {
+            toast("Capital One did not return a balance. Make sure the Capital One extension is installed and Capital One is open.");
+          }
+        }, 4500);
       } catch (err) {
-        console.error("Capital One connection check failed", err);
-        toast(err?.message || "Unable to connect Capital One.");
+        console.error("Capital One sync request failed", err);
+        toast(err?.message || "Unable to request Capital One balance.");
       }
       return;
     }
