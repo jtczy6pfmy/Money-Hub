@@ -66,7 +66,7 @@
       const text = (el.textContent || "").replace(/\s+/g, " ").trim();
       if (!text || text.length > 80) continue;
       if (/^(current balance|available credit|credit limit|payment|amount due|minimum payment|due date)$/i.test(text)) continue;
-      if /^\$?[0-9,]+(?:\.\d{1,2})?$/.test(text);
+      if (/^\$?[0-9,]+(?:\.\d{1,2})?$/.test(text)) continue;
       return text;
     }
     return null;
