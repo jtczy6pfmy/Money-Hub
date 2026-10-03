@@ -488,6 +488,7 @@ function openConcoraLogin() {
     return;
   }
   try { popup.focus(); } catch (_) {}
+  window.postMessage({ type: "MONEY_HUB_REQUEST_CONCORA_REFRESH" }, window.location.origin);
   toast("Concora login opened");
 }
 
