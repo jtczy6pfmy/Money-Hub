@@ -4,7 +4,7 @@
 
   function parseMoney(raw) {
     const text = String(raw || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
-    const matches = [...text.matchAll(/-?\$\s*([0-9][0-9,]*(?:\.\d{1,2})?)/g)];
+    const matches = [...text.matchAll(/-?\$?\s*([0-9][0-9,]*(?:\.\d{1,2})?)/g)];
     const values = matches.map(m => Number(m[1].replace(/,/g, ""))).filter(Number.isFinite);
     return values.length ? values[0] : null;
   }
@@ -61,12 +61,13 @@
       }
     }
 
-    const nodes = container.querySelectorAll("h1,h2,h3,h4,h5,[role='heading'],strong");
+    const excluded = /^(current balance|available credit|credit limit|payment|amount due|minimum payment|due date|account|summary|overview|details|manage|make a payment|view details)$/i;
+    const nodes = container.querySelectorAll("h1,h2,h3,h4,h5,[role='heading'],strong,[class*='title'],[class*='name'],span,div");
     for (const el of nodes) {
       const text = (el.textContent || "").replace(/\s+/g, " ").trim();
-      if (!text || text.length > 80) continue;
-      if (/^(current balance|available credit|credit limit|payment|amount due|minimum payment|due date)$/i.test(text)) continue;
-      if (/^\$?[0-9,]+(?:\.\d{1,2})?$/.test(text)) continue;
+      if (!text || text.length > 80 || excluded.test(text)) continue;
+      if (/^-?\$?[0-9,]+(?:\.\d{1,2})?$/.test(text)) continue;
+      if (/^(image|img|card|credit|logo|png|jpg|jpeg|webp|svg)$/i.test(text)) continue;
       return text;
     }
     return null;
