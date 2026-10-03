@@ -1,6 +1,10 @@
 const api = typeof browser !== "undefined" ? browser : chrome;
 
 api.runtime.onMessage.addListener((msg) => {
+  if (msg?.type === "CONCORA_REFRESH") {
+    refreshConcoraTabs();
+    return;
+  }
   if (msg?.type !== "CONCORA_ACCOUNTS") return;
   forwardAccounts(msg.accounts);
 });
@@ -36,5 +40,17 @@ async function forwardAccounts(accounts) {
     } catch (err) {
       console.error("Concora forwarding failed", err);
     }
+  }
+}
+
+async function refreshConcoraTabs() {
+  const tabs = await api.tabs.query({});
+  for (const tab of tabs) {
+    if (!tab.id || !tab.url) continue;
+    try {
+      const url = new URL(tab.url);
+      if (!/\.myfinanceservice\.com$/i.test(url.hostname)) continue;
+      await api.tabs.sendMessage(tab.id, { type: "CONCORA_REFRESH" });
+    } catch (_) {}
   }
 }
