@@ -481,7 +481,7 @@ const forms = {
 };
 
 function openConcoraLogin() {
-  const url = "https://login.myfinanceservice.com/";
+  const url = "https://concoracredit.myfinanceservice.com/summary";
   const popup = window.open(url, "concoraLogin", "width=520,height=760,resizable=yes,scrollbars=yes");
   if (!popup) {
     toast("Please allow pop-ups for Money Hub, then try Concora again.");
