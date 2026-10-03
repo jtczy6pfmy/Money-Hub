@@ -16,13 +16,57 @@
     return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden";
   }
 
+  function cleanName(raw) {
+    return String(raw || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/\.(png|jpe?g|webp|svg)(\?.*)?$/i, "")
+      .replace(/[-_]+/g, " ")
+      .trim();
+  }
+
   function cardName(container) {
+    // The card names in Concora's summary are rendered inside the card artwork,
+    // so they may not exist as normal text nodes. Check image accessibility
+    // metadata and the image URL before falling back to headings.
+    const imageHints = [];
+    for (const img of container.querySelectorAll("img")) {
+      for (const value of [
+        img.getAttribute("alt"),
+        img.getAttribute("title"),
+        img.getAttribute("aria-label"),
+        img.getAttribute("data-name"),
+        img.getAttribute("data-card-name"),
+        img.getAttribute("src"),
+        img.getAttribute("currentSrc")
+      ]) {
+        const hint = cleanName(value);
+        if (hint) imageHints.push(hint);
+      }
+    }
+
+    const knownBrands = [
+      { re: /\bindigo\b/i, name: "Indigo" },
+      { re: /\bmilestone\b/i, name: "Milestone" },
+      { re: /\bdestiny\b/i, name: "Destiny" }
+    ];
+    for (const hint of imageHints) {
+      const known = knownBrands.find(x => x.re.test(hint));
+      if (known) return known.name;
+    }
+
+    for (const hint of imageHints) {
+      if (!/^(image|img|card|credit|logo|png|jpg|jpeg|webp|svg)$/i.test(hint) && hint.length <= 80) {
+        return hint;
+      }
+    }
+
     const nodes = container.querySelectorAll("h1,h2,h3,h4,h5,[role='heading'],strong");
     for (const el of nodes) {
       const text = (el.textContent || "").replace(/\s+/g, " ").trim();
       if (!text || text.length > 80) continue;
       if (/^(current balance|available credit|credit limit|payment|amount due|minimum payment|due date)$/i.test(text)) continue;
-      if (/^\$?[0-9,]+(?:\.\d{1,2})?$/.test(text)) continue;
+      if /^\$?[0-9,]+(?:\.\d{1,2})?$/.test(text);
       return text;
     }
     return null;
@@ -38,7 +82,7 @@
 
     for (const node of balanceNodes) {
       let container = node;
-      for (let i = 0; i < 5 && container.parentElement; i++) {
+      for (let i = 0; i < 8 && container.parentElement; i++) {
         const text = (container.textContent || "").replace(/\s+/g, " ").trim();
         if (text.length >= 40 && text.length <= 700) {
           const money = parseMoney(text);
