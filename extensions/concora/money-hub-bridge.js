@@ -16,11 +16,3 @@ window.addEventListener("message", (event) => {
     api.runtime.sendMessage({ type: "CONCORA_REFRESH" });
   }
 });
-
-
-window.addEventListener("message", (event) => {
-  if (event.source !== window || event.origin !== window.location.origin) return;
-  if (event.data?.type === "MONEY_HUB_REQUEST_CONCORA_REFRESH") {
-    (typeof browser !== "undefined" ? browser : chrome).runtime.sendMessage({ type: "CONCORA_REFRESH" });
-  }
-});
