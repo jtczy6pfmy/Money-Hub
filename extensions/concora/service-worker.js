@@ -9,6 +9,20 @@ api.runtime.onMessage.addListener((msg) => {
   forwardAccounts(msg.accounts);
 });
 
+if (api.tabs?.onUpdated) {
+  api.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status !== "complete" || !tab?.url) return;
+    try {
+      const url = new URL(tab.url);
+      if (/\.myfinanceservice\.com$/i.test(url.hostname)) {
+        setTimeout(() => {
+          api.tabs.sendMessage(tabId, { type: "CONCORA_REFRESH" }).catch?.(() => {});
+        }, 500);
+      }
+    } catch (_) {}
+  });
+}
+
 async function forwardAccounts(accounts) {
   const tabs = await api.tabs.query({});
   for (const tab of tabs) {
@@ -50,7 +64,9 @@ async function refreshConcoraTabs() {
     try {
       const url = new URL(tab.url);
       if (!/\.myfinanceservice\.com$/i.test(url.hostname)) continue;
-      await api.tabs.sendMessage(tab.id, { type: "CONCORA_REFRESH" });
+      try {
+        await api.tabs.sendMessage(tab.id, { type: "CONCORA_REFRESH" });
+      } catch (_) {}
     } catch (_) {}
   }
 }
